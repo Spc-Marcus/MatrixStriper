@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def read_matrix_csv(input_csv):
+def read_matrix_csv(*args, **kwargs):
     """
     Lit un CSV avec identifiants en première ligne et colonne.
 
@@ -16,7 +16,7 @@ def read_matrix_csv(input_csv):
     # ... à implémenter ...
     pass
 
-def write_matrix_csv(matrix, row_names, col_names, output_csv):
+def write_matrix_csv(*args, **kwargs):
     """
     Sauvegarde une matrice avec identifiants en première ligne et colonne.
 
