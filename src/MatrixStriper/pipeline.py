@@ -10,9 +10,8 @@ def compact_matrix(
     min_col_quality=3,
     min_row_quality=5,
     error_rate=0.025,
-    certitude=0.3,
     distance_thresh=0.1
-):
+) -> dict:
     """
     Orchestration du pipeline de biclustering et compactage de matrice.
 
@@ -33,9 +32,11 @@ def compact_matrix(
     matrix, row_names, col_names = load_csv_matrix(input_csv)
 
     # 2. Pipeline
-    matrix_bin, inhomogenious_regions, steps = pre_processing(
-        matrix, min_col_quality=min_col_quality, certitude=certitude
+    inhomogenious_regions, steps = pre_processing(
+        matrix, min_col_quality=min_col_quality, certitude=0.35, error_rate=error_rate
     )
+    # For now, use the original matrix as binary matrix (assuming it's already binary)
+    matrix_bin = matrix
     patterns = clustering_full_matrix(
         matrix_bin, inhomogenious_regions, steps,
         min_row_quality=min_row_quality, min_col_quality=min_col_quality, error_rate=error_rate
