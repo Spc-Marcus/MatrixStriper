@@ -116,3 +116,124 @@ Détermine si un groupe de colonnes forme un "strip" homogène en appliquant un 
 - Sinon, on applique un clustering hiérarchique (AgglomerativeClustering) sur les lignes (lectures) pour les séparer en deux groupes.
 - On calcule, pour chaque cluster, la proportion de 1 (ou de 0). Si un cluster est presque tout à 0 et l'autre presque tout à 1 (avec une tolérance définie par `error_rate`), alors le groupe de colonnes est considéré comme un strip.
 - Sinon, il est considéré comme ambigu ou inhomogène.
+
+# Fonctions de `post_processing.py`
+
+## `post_processing`
+
+La fonction `post_processing` prend le résultat du biclustering (steps) et la matrice binaire d'origine pour produire :
+- les clusters finaux de reads (lignes),
+- une matrice réduite représentant le profil consensus de chaque cluster sur les stripes (strips) identifiés,
+- la liste des reads orphelins (non clusterisés à la fin),
+- la liste des colonnes non utilisées dans les steps (colonnes non "stripes").
+
+### Fonctionnement général
+
+1. **Initialisation** :
+   - Tous les reads sont placés dans un seul cluster initial.
+
+2. **Application des étapes de biclustering** :
+   - À chaque step, les clusters sont séparés selon les indices fournis (reads1, reads0, cols).
+   - Les colonnes utilisées dans les steps sont marquées comme "stripes".
+
+3. **Filtrage des petits clusters** :
+   - Les clusters de taille inférieure à `min_reads_per_cluster` sont considérés comme orphelins (sauf si ce paramètre vaut `None`).
+
+4. **Réaffectation des reads orphelins** :
+   - Les reads orphelins sont réaffectés au cluster le plus proche (distance de Hamming sur les positions des clusters).
+
+5. **Fusion des clusters similaires** :
+   - Les clusters dont les profils consensus sont trop proches (distance de Hamming < `distance_thresh`) sont fusionnés.
+
+6. **Construction de la matrice réduite** :
+   - Pour chaque cluster, on calcule un profil consensus (moyenne arrondie) sur les colonnes de chaque step (une colonne par step, moyenne sur les colonnes de ce step).
+   - La matrice réduite a donc pour shape `(nb_clusters, nb_steps)`.
+
+7. **Exclusion des reads orphelins finaux** :
+   - Les reads qui ne sont dans aucun cluster à la fin sont ignorés dans la matrice réduite et la liste des clusters, et sont listés séparément.
+
+8. **Détection des colonnes inutilisées** :
+   - Les colonnes de la matrice d'origine qui ne sont utilisées dans aucun step sont listées séparément.
+
+### Paramètres
+
+- `matrix` : `np.ndarray`
+  - Matrice binaire d'entrée (shape `(n_reads, n_positions)`).
+- `steps` : `List[Tuple[List[int], List[int], List[int]]]`
+  - Liste des étapes de biclustering. Chaque step est un tuple `(reads1, reads0, cols)`.
+- `read_names` : `List[str]`
+  - Liste des noms de reads (doit correspondre à l'ordre des lignes de la matrice).
+- `distance_thresh` : `float` (défaut : 0.1)
+  - Seuil de distance de Hamming pour fusionner les clusters similaires.
+- `min_reads_per_cluster` : `int | None` (défaut : 5)
+  - Taille minimale d'un cluster. Si `None`, aucun filtrage n'est appliqué.
+
+### Valeurs de retour
+
+- `clusters` : `List[np.ndarray]`
+  - Liste des clusters finaux, chaque cluster étant un tableau numpy des noms de reads.
+- `reduced_matrix` : `np.ndarray`
+  - Matrice réduite de shape `(nb_clusters, nb_steps)`, chaque ligne étant le profil consensus d'un cluster sur les stripes (une colonne par step).
+- `orphan_reads_names` : `list[str]`
+  - Liste des noms de reads non clusterisés à la fin (orphelins).
+- `unused_columns` : `list[int]`
+  - Liste des indices de colonnes non utilisées dans les steps (colonnes non "stripes").
+
+### Exemple d'utilisation
+
+```python
+import numpy as np
+from src.MatrixStriper.post_processing import post_processing
+
+matrix = np.array([[1, 0, 1], [0, 1, 1], [1, 1, 0]])
+steps = [([0, 2], [1], [0, 2]), ([1], [0, 2], [1])]
+read_names = ['read1', 'read2', 'read3']
+clusters, reduced, orphan_reads, unused_cols = post_processing(matrix, steps, read_names)
+print("Clusters:", clusters)
+print("Matrice réduite:", reduced)
+print("Reads orphelins:", orphan_reads)
+print("Colonnes inutilisées:", unused_cols)
+```
+
+### Remarques
+- Les reads non assignés à un cluster à la fin sont listés dans `orphan_reads_names` et ne sont pas pris en compte dans la matrice réduite.
+- Les colonnes non utilisées dans les steps sont listées dans `unused_columns` et ne sont pas représentées dans la matrice réduite.
+- La matrice réduite permet de comparer les profils des clusters sur les stripes utilisés lors du biclustering.
+
+---
+
+## Sous-fonctions de `post_processing.py`
+
+### `cluster_mean(cluster, matrix)`
+Calcule le profil consensus (moyenne arrondie) d'un cluster sur toutes les colonnes de la matrice.
+- **Paramètres** :
+  - `cluster` : liste d'indices de reads
+  - `matrix` : matrice binaire d'origine
+- **Retour** : vecteur numpy de la moyenne arrondie sur chaque colonne
+
+### `hamming_distance_with_mask(read_vec, mean_vec)`
+Calcule la distance de Hamming entre deux vecteurs binaires (sans masque car la matrice ne contient que 0/1).
+- **Paramètres** :
+  - `read_vec` : vecteur binaire d'un read
+  - `mean_vec` : vecteur consensus d'un cluster
+- **Retour** : float (proportion de positions différentes)
+
+### `merge_similar_clusters(clusters, means, distance_thresh)`
+Fusionne les clusters dont les profils consensus sont trop proches selon la distance de Hamming.
+- **Paramètres** :
+  - `clusters` : liste de clusters (indices de reads)
+  - `means` : liste des profils consensus de chaque cluster
+  - `distance_thresh` : seuil de fusion
+- **Retour** : nouvelle liste de clusters fusionnés
+
+### `reassign_orphans(rem_, clusters, means, matrix, threshold=0.3)`
+Réaffecte les reads orphelins au cluster le plus proche (distance de Hamming).
+- **Paramètres** :
+  - `rem_` : liste des indices de reads orphelins
+  - `clusters` : liste de clusters courants
+  - `means` : profils consensus des clusters
+  - `matrix` : matrice binaire d'origine
+  - `threshold` : seuil de distance pour accepter la réaffectation
+- **Retour** : clusters mis à jour
+
+---
