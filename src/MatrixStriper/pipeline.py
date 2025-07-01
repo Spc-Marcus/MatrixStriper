@@ -1,7 +1,7 @@
 from pre_processing import pre_processing
 from clustering import clustering_full_matrix
 from post_processing import post_processing
-from utils import read_matrix_csv, write_matrix_csv
+from utils import load_csv_matrix, write_matrix_csv
 
 def compact_matrix(
     input_csv,
@@ -30,7 +30,7 @@ def compact_matrix(
         dict: Métriques de compression.
     """
     # 1. Lecture du CSV
-    matrix, row_names, col_names = read_matrix_csv(input_csv)
+    matrix, row_names, col_names = load_csv_matrix(input_csv)
 
     # 2. Pipeline
     matrix_bin, inhomogenious_regions, steps = pre_processing(
