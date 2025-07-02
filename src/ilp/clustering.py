@@ -5,11 +5,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def clustering_full_matrix(input_matrix:np.ndarray, 
-        regions :List[int],
-        steps : List[Tuple[List[int], List[int], List[int]]], 
+        regions :list[int],
+        steps : list[tuple[list[int], list[int], list[int]]], 
         min_row_quality:int=5,
         min_col_quality:int = 3,
-        error_rate : float = 0.025) -> (List[Tuple[List[int], List[int], List[int]]],dict):
+        error_rate : float = 0.025) -> tuple[list[tuple[list[int], list[int], list[int]]], dict]:
     """
     Perform exhaustive iterative biclustering on a binary matrix to extract all significant patterns.
     
@@ -160,7 +160,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     return steps_result, metrics
 
 def largest_only(input_matrix: np.ndarray,
-                 error_rate: float = 0.025,) -> (Tuple[List[int], List[int]], dict):
+                 error_rate: float = 0.025,) -> tuple[tuple[list[int], list[int]], dict]:
     """
     Extract the largest dense submatrix (quasi-biclique of 1s) from a binary matrix.
 
@@ -257,7 +257,7 @@ def clustering_step(input_matrix: np.ndarray,
                     error_rate: float = 0.025,
                     min_row_quality: int = 5,
                     min_col_quality: int = 3,
-                    ) -> (Tuple[List[int], List[int], List[int]], dict):
+                    ) -> tuple[tuple[list[int], list[int], list[int]], dict]:
     """
     Perform a single binary clustering step on a matrix to identify one significant row separation.
     
@@ -379,20 +379,33 @@ def clustering_step(input_matrix: np.ndarray,
         clustering_1 = not clustering_1
         
     # Log final clustering statistics
+    if isinstance(current_cols, range):
+        current_cols = list(current_cols)
+    if isinstance(rw0, range):
+        rw0 = list(rw0)
+    if isinstance(rw1, range):
+        rw1 = list(rw1)
+    logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
     if found:
         if len(rw0) > 0:
-            density_cluster0 = input_matrix[rw0, :][:, current_cols].sum() / (input_matrix[rw0, :][:, current_cols].shape[0] * input_matrix[rw0, :][:, current_cols].shape[1])
+            submatrix0 = input_matrix[rw0, :][:, current_cols]
+            if submatrix0.shape[0] > 0 and submatrix0.shape[1] > 0:
+                density_cluster0 = submatrix0.sum() / (submatrix0.shape[0] * submatrix0.shape[1])
+            else:
+                density_cluster0 = -1
         else:
             density_cluster0 = -1
         if len(rw1) > 0:
-            density_cluster1 = input_matrix[rw1, :][:, current_cols].sum() / (input_matrix[rw1, :][:, current_cols].shape[0] * input_matrix[rw1, :][:, current_cols].shape[1])
+            submatrix1 = input_matrix[rw1, :][:, current_cols]
+            if submatrix1.shape[0] > 0 and submatrix1.shape[1] > 0:
+                density_cluster1 = submatrix1.sum() / (submatrix1.shape[0] * submatrix1.shape[1])
+            else:
+                density_cluster1 = -1
         else:
             density_cluster1 = -1
     else:
         density_cluster0 = -1
         density_cluster1 = -1
-
-    logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
     metrics = {
         "nb_ilp_steps": nb_ilp_steps,
         "max_ilp_cluster_size": max_ilp_cluster_size,
