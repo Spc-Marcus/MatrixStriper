@@ -6,7 +6,6 @@ from utils import load_csv_matrix, write_matrix_csv
 def compact_matrix(
     input_csv,
     output_csv,
-    largest_only=True,
     min_col_quality=3,
     min_row_quality=5,
     error_rate=0.025,
@@ -88,3 +87,21 @@ def compact_matrix(
     if metrics_ilp:
         metrics.update(metrics_ilp)
     return metrics 
+
+
+def pipeline_ilp_largest_only(
+    input_csv,
+    output_txt,
+    error_rate=0.025
+) -> dict:
+    """
+    Orchestration du pipeline de biclustering et compactage de matrice avec ILP.
+    """
+    # 1. Lecture du CSV
+    matrix, row_names, col_names = load_csv_matrix(input_csv)
+    
+    # 2. ILP
+    res , metrics = largest_only_ilp(matrix, error_rate=error_rate)
+    # 3. Sauvegarde
+    save_dict_with_metadata(metrics, output_txt)
+    return metrics

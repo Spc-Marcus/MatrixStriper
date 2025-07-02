@@ -189,6 +189,8 @@ def largest_only(input_matrix: np.ndarray,
         - "row_indices": list, indices of the selected rows
         - "col_indices": list, indices of the selected columns
         - "submatrix_size": int, number of elements in the submatrix
+        - "list_rows_indices": list, indices of the selected rows
+        - "list_cols_indices": list, indices of the selected columns
 
     Algorithm
     ---------
@@ -235,6 +237,8 @@ def largest_only(input_matrix: np.ndarray,
         "row_indices": row_indices if found else [],
         "col_indices": col_indices if found else [],
         "submatrix_size": submatrix_size,
+        "list_rows_indices": row_indices,
+        "list_cols_indices": col_indices,
     }
     return result, metrics
 
