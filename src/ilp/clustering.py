@@ -84,6 +84,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     """
     # Initialize result list with existing steps
     steps_result = steps.copy() if steps else []
+    metrics_list = []
     
     # Process each region if any regions are provided
     if len(regions) > 0:
@@ -97,7 +98,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                 # Iteratively extract patterns until no more significant ones found
                 while len(remain_cols) >= min_col_quality and status:
                     # Apply clustering to current remaining columns
-                    (reads1, reads0, cols), metrics = clustering_step(input_matrix[:, remain_cols], 
+                    (reads1, reads0, cols), metricclustering_steps = clustering_step(input_matrix[:, remain_cols], 
                                                           error_rate=error_rate,
                                                           min_row_quality=min_row_quality, 
                                                           min_col_quality=min_col_quality)
@@ -111,6 +112,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                     else:
                         # Save valid clustering step
                         steps_result.append((reads1, reads0, cols))
+                        metrics_list.append(metricclustering_steps)
                         # Remove processed columns from remaining set
                         remain_cols = [c for c in remain_cols if c not in cols]
     
@@ -120,7 +122,32 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         logger.info(f"Step {i}: Group1={len(step[0])}, Group0={len(step[1])}, Cols={len(step[2])}")
     
     # Filter and return only valid steps with non-empty groups and sufficient columns
-    return [step for step in steps_result if len(step[0]) > 0 and len(step[1]) > 0 and len(step[2]) >= min_col_quality]
+    valid_steps = [step for step in steps_result if len(step[0]) > 0 and len(step[1]) > 0 and len(step[2]) >= min_col_quality]
+    # Calcul des métriques globales
+    nb_ilp_steps = sum((m.get('nb_ilp_steps', 0) for m in metrics_list))
+    max_ilp_cluster_size = max((m.get('max_ilp_cluster_size', -1) for m in metrics_list), default=-1)
+    # Densités cluster0
+    dens0_list = [m.get('density_cluster0', -1) for m in metrics_list if m.get('density_cluster0', -1) >= 0]
+    dens1_list = [m.get('density_cluster1', -1) for m in metrics_list if m.get('density_cluster1', -1) >= 0]
+    min_density_cluster0 = min(dens0_list) if dens0_list else -1
+    max_density_cluster0 = max(dens0_list) if dens0_list else -1
+    mean_density_cluster0 = sum(dens0_list)/len(dens0_list) if dens0_list else -1
+    min_density_cluster1 = min(dens1_list) if dens1_list else -1
+    max_density_cluster1 = max(dens1_list) if dens1_list else -1
+    mean_density_cluster1 = sum(dens1_list)/len(dens1_list) if dens1_list else -1
+    nb_strips_from_ilp = len(valid_steps)
+    metrics = {
+        "nb_ilp_steps": nb_ilp_steps,
+        "max_ilp_cluster_size": max_ilp_cluster_size,
+        "min_density_cluster0": min_density_cluster0,
+        "max_density_cluster0": max_density_cluster0,
+        "mean_density_cluster0": mean_density_cluster0,
+        "min_density_cluster1": min_density_cluster1,
+        "max_density_cluster1": max_density_cluster1,
+        "mean_density_cluster1": mean_density_cluster1,
+        "nb_strips_from_ilp": nb_strips_from_ilp,
+    }
+    return valid_steps, metrics
 
 def largest_only(input_matrix: np.ndarray,
                  error_rate: float = 0.025,
@@ -303,11 +330,17 @@ def clustering_step(input_matrix: np.ndarray,
         
     # Log final clustering statistics
     if found:
-        density_cluster0 = input_matrix[rw0, :][:, current_cols].sum() / (input_matrix[rw0, :][:, current_cols].shape[0] * input_matrix[rw0, :][:, current_cols].shape[1])
-        density_cluster1 = input_matrix[rw1, :][:, current_cols].sum() / (input_matrix[rw1, :][:, current_cols].shape[0] * input_matrix[rw1, :][:, current_cols].shape[1])
+        if len(rw0) > 0:
+            density_cluster0 = input_matrix[rw0, :][:, current_cols].sum() / (input_matrix[rw0, :][:, current_cols].shape[0] * input_matrix[rw0, :][:, current_cols].shape[1])
+        else:
+            density_cluster0 = -1
+        if len(rw1) > 0:
+            density_cluster1 = input_matrix[rw1, :][:, current_cols].sum() / (input_matrix[rw1, :][:, current_cols].shape[0] * input_matrix[rw1, :][:, current_cols].shape[1])
+        else:
+            density_cluster1 = -1
     else:
-        density_cluster0 = 0.0
-        density_cluster1 = 0.0
+        density_cluster0 = -1
+        density_cluster1 = -1
 
     logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
     metrics = {
