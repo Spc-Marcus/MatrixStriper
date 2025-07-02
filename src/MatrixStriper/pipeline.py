@@ -1,7 +1,9 @@
-from pre_processing import pre_processing
-from clustering import clustering_full_matrix,largest_only_ilp
-from post_processing import post_processing
-from utils import load_csv_matrix, write_matrix_csv, save_dict_with_metadata
+from .pre_processing import pre_processing
+from ilp.clustering import clustering_full_matrix, largest_only
+from .post_processing import post_processing
+from utils.utils import load_csv_matrix, write_matrix_csv, save_dict_with_metadata
+import logging
+logger = logging.getLogger(__name__)
 
 def compact_matrix(
     input_csv,
@@ -29,7 +31,7 @@ def compact_matrix(
         dict: Métriques de compression.
     """
     # 1. Lecture du CSV
-    matrix, row_names, col_names = load_csv_matrix(input_csv)
+    matrix, row_names = load_csv_matrix(input_csv)
 
     # 2. Pipeline
     inhomogenious_regions, steps = pre_processing(
@@ -41,11 +43,15 @@ def compact_matrix(
         matrix_bin, inhomogenious_regions, steps,
         min_row_quality=min_row_quality, min_col_quality=min_col_quality, error_rate=error_rate
     )
+    logger.debug(f"Steps after ILP: {steps}")
     clusters, reduced_matrix, orphan_reads_names, unused_columns = post_processing(matrix_bin, steps, row_names, distance_thresh=distance_thresh)
-    row_names = ["read_" + str(i) for i in range(len(reduced_matrix))]
-    col_names = ["strip_" + str(i) for i in range(len(reduced_matrix[0]))]
+    row_names = ["read_" + str(i) for i in range(len(clusters))]
+    col_names = ["strip_" + str(i) for i in range(len(steps))]
+    logger.debug(f"Row names: {row_names}")
+    logger.debug(f"Col names: {col_names}")
+    logger.debug(f"Reduced matrix: {reduced_matrix}")
     # 3. Sauvegarde
-    write_matrix_csv(output_csv, reduced_matrix, row_names, col_names)
+    write_matrix_csv(reduced_matrix, row_names, col_names, output_csv)
 
     # 4. Métriques de compression
     nb_reads = len(matrix)
@@ -83,6 +89,8 @@ def compact_matrix(
         "strip_size_min": min(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "strip_size_max": max(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "strip_size_mean": sum(nb_positions_per_strip)/len(nb_positions_per_strip) if nb_positions_per_strip else 0,
+        "list_of_steps": steps,
+        "list_of_clusters": clusters,
     }
     # Ajout des métriques ILP
     if metrics_ilp:
@@ -100,10 +108,10 @@ def pipeline_ilp_largest_only(
     Orchestration du pipeline de biclustering et compactage de matrice avec ILP.
     """
     # 1. Lecture du CSV
-    matrix, row_names, col_names = load_csv_matrix(input_csv)
+    matrix, read_names = load_csv_matrix(input_csv)
     
     # 2. ILP
-    res , metrics = largest_only_ilp(matrix, error_rate=error_rate)
+    res , metrics = largest_only(matrix, error_rate=error_rate)
     # 3. Sauvegarde
     save_dict_with_metadata(metrics, output_txt)
     return metrics

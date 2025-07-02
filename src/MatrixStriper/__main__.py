@@ -34,7 +34,6 @@ if __name__ == "__main__":
         input_csv=args.input_csv,
         output_txt=args.output_txt,
         output_csv=args.output_csv,
-        largest_only=args.largest_only,
         min_col_quality=args.min_col_quality,
         min_row_quality=args.min_row_quality,
         error_rate=args.error_rate,

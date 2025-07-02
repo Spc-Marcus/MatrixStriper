@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def clustering_full_matrix(input_matrix:np.ndarray, 
-        regions :List[List[int]],
+        regions :List[int],
         steps : List[Tuple[List[int], List[int], List[int]]], 
         min_row_quality:int=5,
         min_col_quality:int = 3,
@@ -24,8 +24,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         data points and features respectively. Values indicate feature presence (1), 
         absence (0).
     regions : List[List[int]]
-        List of column index groups to process separately. Each region contains 
-        column indices that should be analyzed together as a coherent unit.
+        List of column indices to process.
     steps : List[Tuple[List[int], List[int], List[int]]]
         Pre-existing clustering results to preserve. Each tuple contains
         (row_indices_group1, row_indices_group2, column_indices).
@@ -86,43 +85,38 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     steps_result = steps.copy() if steps else []
     metrics_list = []
     
-    # Process each region if any regions are provided
-    if len(regions) > 0:
-        for idx, region in enumerate(regions):   
-            # Initialize remaining columns for this region
-            remain_cols = region
-            status = True
+    
+    remain_cols = regions
+    status = True
             
-            # Only process regions that meet minimum quality threshold
-            if len(remain_cols) >= min_col_quality:
-                # Iteratively extract patterns until no more significant ones found
-                while len(remain_cols) >= min_col_quality and status:
+    # Only process regions that meet minimum quality threshold
+    if len(remain_cols) >= min_col_quality:
+        # Iteratively extract patterns until no more significant ones found
+        while len(remain_cols) >= min_col_quality and status:
                     # Apply clustering to current remaining columns
-                    (reads1, reads0, cols), metricclustering_steps = clustering_step(input_matrix[:, remain_cols], 
+            (reads1, reads0, cols), metricclustering_steps = clustering_step(input_matrix[:, remain_cols], 
                                                           error_rate=error_rate,
                                                           min_row_quality=min_row_quality, 
                                                           min_col_quality=min_col_quality)
                     
                     # Convert local column indices back to global matrix coordinates
-                    cols = [remain_cols[c] for c in cols]
+            cols = [remain_cols[c] for c in cols]
                     
-                    # Check if valid pattern was found
-                    if len(cols) == 0:
-                        status = False  # No more patterns, stop processing this region
-                    else:
-                        # Save valid clustering step
-                        steps_result.append((reads1, reads0, cols))
-                        metrics_list.append(metricclustering_steps)
-                        # Remove processed columns from remaining set
-                        remain_cols = [c for c in remain_cols if c not in cols]
+            # Check if valid pattern was found
+            if len(cols) == 0:
+                status = False  # No more patterns, stop processing this region
+            else:
+                # Save valid clustering step
+                steps_result.append((reads1, reads0, cols))
+                metrics_list.append(metricclustering_steps)
+                # Remove processed columns from remaining set
+                remain_cols = [c for c in remain_cols if c not in cols]
     
     # Log clustering results for debugging
     logger.info(f"Number of clustering steps: {len(steps_result)}")
     for i, step in enumerate(steps_result):
         logger.info(f"Step {i}: Group1={len(step[0])}, Group0={len(step[1])}, Cols={len(step[2])}")
     
-    # Filter and return only valid steps with non-empty groups and sufficient columns
-    valid_steps = [step for step in steps_result if len(step[0]) > 0 and len(step[1]) > 0 and len(step[2]) >= min_col_quality]
     # Calcul des métriques globales
     nb_ilp_steps = sum((m.get('nb_ilp_steps', 0) for m in metrics_list))
     max_ilp_cluster_size = max((m.get('max_ilp_cluster_size', -1) for m in metrics_list), default=-1)
@@ -135,7 +129,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     min_density_cluster1 = min(dens1_list) if dens1_list else -1
     max_density_cluster1 = max(dens1_list) if dens1_list else -1
     mean_density_cluster1 = sum(dens1_list)/len(dens1_list) if dens1_list else -1
-    nb_strips_from_ilp = len(valid_steps)
+    nb_strips_from_ilp = len(steps_result)
     metrics = {
         "nb_ilp_steps": nb_ilp_steps,
         "max_ilp_cluster_size": max_ilp_cluster_size,
@@ -147,7 +141,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         "mean_density_cluster1": mean_density_cluster1,
         "nb_strips_from_ilp": nb_strips_from_ilp,
     }
-    return valid_steps, metrics
+    return steps_result, metrics
 
 def largest_only(input_matrix: np.ndarray,
                  error_rate: float = 0.025,) -> (Tuple[List[int], List[int]], dict):

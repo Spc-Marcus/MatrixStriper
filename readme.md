@@ -300,3 +300,84 @@ Effectue une seule étape de clustering binaire sur une matrice pour identifier 
   - Retourne des listes vides si aucun motif significatif n'est trouvé.
 
 ---
+
+# Fonctions de `pipeline.py`
+
+## `compact_matrix`
+
+Cette fonction orchestre l'ensemble du pipeline de biclustering et de compactage de matrice. Elle prend en entrée un fichier CSV de matrice binaire, applique le prétraitement, le biclustering, le post-traitement, puis sauvegarde la matrice réduite et les métriques de compression.
+
+### Fonctionnement général
+
+1. **Lecture de la matrice** :
+   - Charge la matrice binaire et les noms de lignes depuis un fichier CSV.
+2. **Prétraitement** :
+   - Identifie les régions inhomogènes et les strips initiaux via `pre_processing`.
+3. **Biclustering** :
+   - Applique `clustering_full_matrix` pour extraire tous les motifs significatifs sur les régions inhomogènes.
+4. **Post-traitement** :
+   - Regroupe les reads en clusters finaux, construit la matrice réduite, identifie les reads orphelins et les colonnes inutilisées.
+5. **Sauvegarde** :
+   - Écrit la matrice réduite dans un CSV et sauvegarde les métriques dans un fichier texte.
+
+### Paramètres
+- `input_csv` : `str` — Chemin du fichier CSV d'entrée.
+- `output_txt` : `str` — Chemin du fichier texte pour les métriques.
+- `output_csv` : `str` — Chemin du fichier CSV de sortie.
+- `min_col_quality` : `int` (défaut : 3) — Qualité minimale des colonnes.
+- `min_row_quality` : `int` (défaut : 5) — Qualité minimale des lignes.
+- `error_rate` : `float` (défaut : 0.025) — Taux d'erreur toléré.
+- `distance_thresh` : `float` (défaut : 0.1) — Seuil de distance de Hamming pour fusionner les clusters.
+
+### Valeur de retour
+- `dict` : Dictionnaire de métriques de compression (nombre de clusters, ratio de compression, etc).
+
+---
+
+## `pipeline_ilp_largest_only`
+
+Pipeline alternatif qui ne conserve que la plus grande sous-matrice dense (cluster principal) via ILP.
+
+### Fonctionnement général
+1. **Lecture de la matrice** depuis un CSV.
+2. **Recherche du plus grand cluster** avec `largest_only`.
+3. **Sauvegarde** des métriques dans un fichier texte.
+
+### Paramètres
+- `input_csv` : `str` — Chemin du fichier CSV d'entrée.
+- `output_txt` : `str` — Chemin du fichier texte pour les métriques.
+- `error_rate` : `float` (défaut : 0.025) — Taux d'erreur toléré.
+
+### Valeur de retour
+- `dict` : Dictionnaire de métriques sur le cluster principal.
+
+---
+
+# Fonctions utilitaires (`utils.py`)
+
+## `load_csv_matrix`
+Charge une matrice binaire (0/1) depuis un fichier CSV et retourne la matrice ainsi que la liste des noms de lignes.
+
+- **Paramètres** :
+  - `csv_file_path` : `str` — Chemin du fichier CSV.
+- **Retour** :
+  - `matrix` : `np.ndarray` — Matrice binaire.
+  - `row_names` : `list` — Liste des noms de lignes.
+
+## `write_matrix_csv`
+Sauvegarde une matrice (avec noms de lignes et de colonnes) dans un fichier CSV.
+
+- **Paramètres** :
+  - `matrix` : `np.ndarray` — Matrice à sauvegarder.
+  - `row_names` : `list` — Noms des lignes.
+  - `col_names` : `list` — Noms des colonnes.
+  - `output_csv` : `str` — Chemin du fichier de sortie.
+
+## `save_dict_with_metadata`
+Enregistre un dictionnaire dans un fichier texte, en ajoutant des métadonnées (date, heure, nombre de clés).
+
+- **Paramètres** :
+  - `data` : `dict` — Dictionnaire à sauvegarder.
+  - `output_txt` : `str` — Chemin du fichier de sortie.
+
+---

@@ -4,9 +4,25 @@ import pulp as plp
 import numpy as np
 from typing import List, Tuple
 import logging
-
+import contextlib
+import sys
+import os
 logger = logging.getLogger(__name__)
 
+@contextlib.contextmanager
+def suppress_pulp_output():
+    """Context manager to suppress PuLP output"""
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    try:
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        yield
+    finally:
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
 def find_quasi_biclique_max_ones_comp(
     input_matrix: np.ndarray,

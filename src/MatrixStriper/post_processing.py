@@ -81,6 +81,9 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
     clusters = [list(range(len(read_names)))]
     logger.debug(f"Initial clusters: {len(clusters)} cluster(s) with {len(read_names)} reads.")
     unused_columns = set(range(matrix.shape[1]))
+    logger.debug(f"Initial unused columns: {unused_columns}")
+    logger.debug(f"Initial clusters: {clusters}")
+    logger.debug(f"Initial steps: {steps}")
     # 2. Application des étapes de biclustering
     for step_idx, step in enumerate(steps):
         reads1, reads0, cols = step
@@ -135,7 +138,6 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
 
     # 7. Conversion des indices en noms et matrice réduite
     result_clusters = []
-    n_steps = len(steps)
     reduced_matrix = []
     clustered_reads = set()
     for idx, cluster in enumerate(clusters):

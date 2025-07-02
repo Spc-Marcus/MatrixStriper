@@ -74,7 +74,6 @@ def is_strip(matrix, column_indices, error_rate=0.025):
         metric='hamming'
     )
     logger.debug("Clustering hiérarchique des lignes...")
-    print('submatrix:', submatrix)
 
     try:
         # Cluster the rows (reads)
