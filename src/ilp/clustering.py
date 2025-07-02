@@ -1,4 +1,8 @@
 from .ilp import * 
+from typing import List, Tuple
+import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
 def clustering_full_matrix(input_matrix:np.ndarray, 
         regions :List[List[int]],
@@ -39,8 +43,8 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     -------
     List[Tuple[List[int], List[int], List[int]]]
         Complete list of all valid clustering steps found. Each tuple contains:
-        - [0] : List[int] - Row indices in first group (pattern match)
-        - [1] : List[int] - Row indices in second group (pattern opposite)  
+        - [0] : List[int] - Row indices in first group (pattern match)(0s)
+        - [1] : List[int] - Row indices in second group (pattern opposite)(1s)
         - [2] : List[int] - Column indices where this separation is significant
         
         Only returns steps where both groups are non-empty and column count
@@ -49,10 +53,12 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         Dictionary containing the following metrics:
         - "nb_ilp_steps": int
         - "max_ilp_cluster_size": int
-        - "max_ilp_cluster_density": int
-        - "min_density_cluster": float
-        - "max_density_cluster": float
-        - "mean_density_cluster": float
+        - "min_density_cluster0": float
+        - "max_density_cluster0": float
+        - "mean_density_cluster0": float
+        - "min_density_cluster1": float
+        - "max_density_cluster1": float
+        - "mean_density_cluster1": float
         - "nb_strips_from_ilp": int
         
 
@@ -76,12 +82,50 @@ def clustering_full_matrix(input_matrix:np.ndarray,
        - Both row groups contain at least one element
        - Column set meets minimum quality requirements
     """
-    pass
+    # Initialize result list with existing steps
+    steps_result = steps.copy() if steps else []
+    
+    # Process each region if any regions are provided
+    if len(regions) > 0:
+        for idx, region in enumerate(regions):   
+            # Initialize remaining columns for this region
+            remain_cols = region
+            status = True
+            
+            # Only process regions that meet minimum quality threshold
+            if len(remain_cols) >= min_col_quality:
+                # Iteratively extract patterns until no more significant ones found
+                while len(remain_cols) >= min_col_quality and status:
+                    # Apply clustering to current remaining columns
+                    (reads1, reads0, cols), metrics = clustering_step(input_matrix[:, remain_cols], 
+                                                          error_rate=error_rate,
+                                                          min_row_quality=min_row_quality, 
+                                                          min_col_quality=min_col_quality)
+                    
+                    # Convert local column indices back to global matrix coordinates
+                    cols = [remain_cols[c] for c in cols]
+                    
+                    # Check if valid pattern was found
+                    if len(cols) == 0:
+                        status = False  # No more patterns, stop processing this region
+                    else:
+                        # Save valid clustering step
+                        steps_result.append((reads1, reads0, cols))
+                        # Remove processed columns from remaining set
+                        remain_cols = [c for c in remain_cols if c not in cols]
+    
+    # Log clustering results for debugging
+    logger.info(f"Number of clustering steps: {len(steps_result)}")
+    for i, step in enumerate(steps_result):
+        logger.info(f"Step {i}: Group1={len(step[0])}, Group0={len(step[1])}, Cols={len(step[2])}")
+    
+    # Filter and return only valid steps with non-empty groups and sufficient columns
+    return [step for step in steps_result if len(step[0]) > 0 and len(step[1]) > 0 and len(step[2]) >= min_col_quality]
 
 def largest_only(input_matrix: np.ndarray,
                  error_rate: float = 0.025,
                  min_row_quality: int = 5,
-                 min_col_quality: int = 3,) -> (Tuple[List[int], List[int], List[int]], dict):
+                 min_col_quality: int = 3,) -> (Tuple[List[int], List[int]], dict):
     """
     Extract the largest dense submatrix (quasi-biclique of 1s) from a binary matrix.
 
@@ -108,10 +152,9 @@ def largest_only(input_matrix: np.ndarray,
 
     Returns
     -------
-    Tuple[List[int], List[int], List[int]]
+    Tuple[List[int], List[int]]
         - [0] : List[int] - Row indices of the largest dense cluster (pattern match)
-        - [1] : List[int] - Always empty (no opposite cluster in this mode)
-        - [2] : List[int] - Column indices of the largest dense cluster
+        - [1] : List[int] - Column indices of the largest dense cluster
     dict
         Dictionary containing the following metrics:
         - "nb_rows": int, number of rows in the cluster
@@ -165,20 +208,18 @@ def clustering_step(input_matrix: np.ndarray,
     -------
     Tuple[List[int], List[int], List[int]]
         Triple containing the results of binary clustering:
-        - [0] : List[int] - Row indices with positive pattern (predominantly 1s)
-        - [1] : List[int] - Row indices with negative pattern (predominantly 0s)  
+        - [0] : List[int] - Row indices with positive pattern (predominantly 0s)
+        - [1] : List[int] - Row indices with negative pattern (predominantly 1s)  
         - [2] : List[int] - Column indices where separation is most significant
         
         Empty lists are returned for categories where no significant patterns are found.
     dict
         Dictionary containing the following metrics:
+        - "found": bool, True if a valid cluster was found
         - "nb_ilp_steps": int
         - "max_ilp_cluster_size": int
-        - "max_ilp_cluster_density": int
-        - "min_density_cluster": float
-        - "max_density_cluster": float
-        - "mean_density_cluster": float
-        - "nb_strips_from_ilp": int
+        - "density_cluster0": float
+        - "density_cluster1": float
     
     Algorithm
     ---------
@@ -205,4 +246,75 @@ def clustering_step(input_matrix: np.ndarray,
        - Stop when fewer than min_col_quality columns remain  
        - Stop when no significant patterns are detected
     """
-    pass
+    # Variable to track the number of ILP steps
+    nb_ilp_steps = 0
+    max_ilp_cluster_size = 0
+    found = False
+
+    # Create binary matrices for pattern detection
+    # Handle -1 values by treating them as 0s in positive pattern matrix
+    matrix1 = input_matrix.copy()
+    matrix1[matrix1 == -1] = 0  # Convert missing values to 0 for positive patterns
+    
+    # Create inverted matrix for negative pattern detection
+    # Convert -1 to 1, then invert all values (0->1, 1->0)
+    matrix0 = input_matrix.copy()
+    matrix0[matrix0 == -1] = 1
+    matrix0 = (matrix0 - 1) * -1  # Invert matrix for negative pattern detection
+    
+    # Initialize tracking variables for iterative clustering
+    remain_rows = range(matrix1.shape[0])  # All rows initially available
+    current_cols = range(matrix1.shape[1])  # All columns initially available
+    clustering_1 = True  # Alternate between positive (True) and negative (False) patterns
+    status = True  # Continue while valid patterns are found
+    rw1, rw0 = [], []  # Accumulate rows for positive and negative groups
+    
+    # Iteratively extract patterns until insufficient data remains
+    while len(remain_rows) >= min_row_quality and len(current_cols) >= min_col_quality and status:
+        # Apply quasi-biclique detection on appropriate matrix
+        if clustering_1:
+            # Search for positive patterns (dense regions of 1s)
+            rw, cl, status = find_quasi_biclique(matrix1[remain_rows][:, current_cols], error_rate)
+        else:
+            # Search for negative patterns (dense regions of 0s in original)
+            rw, cl, status = find_quasi_biclique(matrix0[remain_rows][:, current_cols], error_rate)
+        nb_ilp_steps += 1
+             
+        # Convert local indices back to global matrix coordinates
+        rw = [remain_rows[r] for r in rw]  # Map row indices to original matrix
+        cl = [current_cols[c] for c in cl]  # Map column indices to original matrix
+        
+        current_cols = cl  # Update working column set to detected significant columns
+        
+        # Accumulate rows into appropriate pattern group if valid pattern found
+        if status and len(cl) > 0:
+            found = True
+            if len(rw) * len(cl) > max_ilp_cluster_size:
+                max_ilp_cluster_size = len(rw) * len(cl)
+            if clustering_1:
+                rw1.extend(rw)  # Add to positive pattern group
+            else:
+                rw0.extend(rw)  # Add to negative pattern group
+                
+        # Remove processed rows from remaining set for next iteration
+        remain_rows = [r for r in remain_rows if r not in rw]
+        # Alternate pattern detection type for next iteration
+        clustering_1 = not clustering_1
+        
+    # Log final clustering statistics
+    if found:
+        density_cluster0 = input_matrix[rw0, :][:, current_cols].sum() / (input_matrix[rw0, :][:, current_cols].shape[0] * input_matrix[rw0, :][:, current_cols].shape[1])
+        density_cluster1 = input_matrix[rw1, :][:, current_cols].sum() / (input_matrix[rw1, :][:, current_cols].shape[0] * input_matrix[rw1, :][:, current_cols].shape[1])
+    else:
+        density_cluster0 = 0.0
+        density_cluster1 = 0.0
+
+    logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
+    metrics = {
+        "nb_ilp_steps": nb_ilp_steps,
+        "max_ilp_cluster_size": max_ilp_cluster_size,
+        "density_cluster0": density_cluster0,
+        "density_cluster1": density_cluster1,
+        "found": found,
+    }
+    return (rw0, rw1, current_cols), metrics
