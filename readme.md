@@ -237,3 +237,66 @@ Réaffecte les reads orphelins au cluster le plus proche (distance de Hamming).
 - **Retour** : clusters mis à jour
 
 ---
+
+# Fonctions de `clustering.py`
+
+## `clustering_full_matrix`
+
+Cette fonction applique un biclustering exhaustif et itératif sur une matrice binaire pour extraire tous les motifs significatifs (séparations de lignes selon des motifs de colonnes). Elle traite chaque région de colonnes indépendamment, applique un clustering binaire, et accumule les étapes valides.
+
+- **Paramètres** :
+  - `input_matrix` : `np.ndarray` — Matrice binaire d'entrée (0/1).
+  - `regions` : `List[List[int]]` — Groupes d'indices de colonnes à traiter séparément.
+  - `steps` : `List[Tuple[List[int], List[int], List[int]]]` — Résultats de clustering préexistants à préserver.
+  - `min_row_quality` : `int` — Nombre minimal de lignes pour un cluster valide (défaut : 5).
+  - `min_col_quality` : `int` — Nombre minimal de colonnes pour traiter une région (défaut : 3).
+  - `error_rate` : `float` — Taux d'erreur toléré pour la détection de motifs (défaut : 0.025).
+
+- **Retour** :
+  - `steps` : Liste de toutes les étapes de clustering valides trouvées (triplets : indices lignes groupe 1, groupe 2, colonnes).
+  - `metrics` : Dictionnaire de métriques sur le biclustering (nombre d'étapes, taille max de cluster, densité, etc).
+
+- **Remarque** :
+  - Seules les étapes où les deux groupes de lignes sont non vides et où le nombre de colonnes atteint le seuil sont conservées.
+
+## `largest_only`
+
+Cette fonction extrait la plus grande sous-matrice dense (quasi-biclique de 1) d'une matrice binaire, avec une densité minimale de 1 - error_rate. Elle ne fait qu'un seul passage pour trouver le cluster principal.
+
+- **Paramètres** :
+  - `input_matrix` : `np.ndarray` — Matrice binaire d'entrée (0/1).
+  - `error_rate` : `float` — Densité minimale requise (défaut : 0.025).
+  - `min_row_quality` : `int` — Nombre minimal de lignes pour un cluster (défaut : 5).
+  - `min_col_quality` : `int` — Nombre minimal de colonnes pour un cluster (défaut : 3).
+
+- **Retour** :
+  - Tuple de listes :
+    - Indices des lignes du cluster principal
+    - Liste vide (pas de cluster opposé)
+    - Indices des colonnes du cluster principal
+  - Dictionnaire de métriques (taille, densité, indices, etc)
+
+- **Remarque** :
+  - Si aucun cluster valide n'est trouvé, retourne des listes vides et found=False dans les métriques.
+
+## `clustering_step`
+
+Effectue une seule étape de clustering binaire sur une matrice pour identifier une séparation significative de lignes.
+
+- **Paramètres** :
+  - `input_matrix` : `np.ndarray` — Matrice binaire d'entrée (0/1).
+  - `error_rate` : `float` — Taux d'erreur toléré pour la détection de motifs (défaut : 0.025).
+  - `min_row_quality` : `int` — Nombre minimal de lignes pour continuer (défaut : 5).
+  - `min_col_quality` : `int` — Nombre minimal de colonnes pour continuer (défaut : 3).
+
+- **Retour** :
+  - Tuple de listes :
+    - Indices des lignes à 1 (pattern positif)
+    - Indices des lignes à 0 (pattern négatif)
+    - Indices des colonnes où la séparation est la plus significative
+  - Dictionnaire de métriques sur l'étape (taille, densité, etc)
+
+- **Remarque** :
+  - Retourne des listes vides si aucun motif significatif n'est trouvé.
+
+---
