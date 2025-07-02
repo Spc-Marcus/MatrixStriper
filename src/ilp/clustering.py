@@ -1,4 +1,4 @@
-from ilp.ilp_pulp import find_quasi_biclique_max_ones_comp as ilp
+from ilp.ilp_grb import find_quasi_biclique_max_ones_comp as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
@@ -84,8 +84,8 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     # Initialize result list with existing steps
     steps_result = steps.copy() if steps else []
     metrics_list = []
-    
-    
+    logger.info(f"Starting clustering full matrix")
+    logger.info(f"Regions: {regions}")
     remain_cols = regions
     status = True
             
@@ -104,32 +104,47 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                     
             # Check if valid pattern was found
             if len(cols) == 0:
+                logger.info(f"No more patterns, stop processing this region")
                 status = False  # No more patterns, stop processing this region
             else:
                 # Save valid clustering step
                 steps_result.append((reads1, reads0, cols))
                 metrics_list.append(metricclustering_steps)
-                # Remove processed columns from remaining set
+
+                    # Remove processed columns from remaining set
                 remain_cols = [c for c in remain_cols if c not in cols]
-    
+                logger.info(f"Steps found =================================================================: {steps_result}")
+                logger.info(f"Metrics: {metrics_list}")
     # Log clustering results for debugging
     logger.info(f"Number of clustering steps: {len(steps_result)}")
     for i, step in enumerate(steps_result):
         logger.info(f"Step {i}: Group1={len(step[0])}, Group0={len(step[1])}, Cols={len(step[2])}")
     
     # Calcul des métriques globales
-    nb_ilp_steps = sum((m.get('nb_ilp_steps', 0) for m in metrics_list))
-    max_ilp_cluster_size = max((m.get('max_ilp_cluster_size', -1) for m in metrics_list), default=-1)
-    # Densités cluster0
-    dens0_list = [m.get('density_cluster0', -1) for m in metrics_list if m.get('density_cluster0', -1) >= 0]
-    dens1_list = [m.get('density_cluster1', -1) for m in metrics_list if m.get('density_cluster1', -1) >= 0]
-    min_density_cluster0 = min(dens0_list) if dens0_list else -1
-    max_density_cluster0 = max(dens0_list) if dens0_list else -1
-    mean_density_cluster0 = sum(dens0_list)/len(dens0_list) if dens0_list else -1
-    min_density_cluster1 = min(dens1_list) if dens1_list else -1
-    max_density_cluster1 = max(dens1_list) if dens1_list else -1
-    mean_density_cluster1 = sum(dens1_list)/len(dens1_list) if dens1_list else -1
-    nb_strips_from_ilp = len(steps_result)
+    if metrics_list:
+        nb_ilp_steps = sum((m.get('nb_ilp_steps', 0) for m in metrics_list))
+        max_ilp_cluster_size = max((m.get('max_ilp_cluster_size', -1) for m in metrics_list), default=-1)
+        dens0_list = [m.get('density_cluster0', -1) for m in metrics_list if m.get('density_cluster0', -1) >= 0]
+        dens1_list = [m.get('density_cluster1', -1) for m in metrics_list if m.get('density_cluster1', -1) >= 0]
+        min_density_cluster0 = min(dens0_list) if dens0_list else -1
+        max_density_cluster0 = max(dens0_list) if dens0_list else -1
+        mean_density_cluster0 = sum(dens0_list)/len(dens0_list) if dens0_list else -1
+        min_density_cluster1 = min(dens1_list) if dens1_list else -1
+        max_density_cluster1 = max(dens1_list) if dens1_list else -1
+        mean_density_cluster1 = sum(dens1_list)/len(dens1_list) if dens1_list else -1
+        nb_strips_from_ilp = len(steps_result)
+        found = True
+    else:
+        nb_ilp_steps = 0
+        max_ilp_cluster_size = -1
+        min_density_cluster0 = -1
+        max_density_cluster0 = -1
+        mean_density_cluster0 = -1
+        min_density_cluster1 = -1
+        max_density_cluster1 = -1
+        mean_density_cluster1 = -1
+        nb_strips_from_ilp = 0
+        found = False
     metrics = {
         "nb_ilp_steps": nb_ilp_steps,
         "max_ilp_cluster_size": max_ilp_cluster_size,
@@ -140,6 +155,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         "max_density_cluster1": max_density_cluster1,
         "mean_density_cluster1": mean_density_cluster1,
         "nb_strips_from_ilp": nb_strips_from_ilp,
+        "found": found
     }
     return steps_result, metrics
 

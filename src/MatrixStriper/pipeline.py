@@ -31,20 +31,26 @@ def compact_matrix(
         dict: Métriques de compression.
     """
     # 1. Lecture du CSV
+    logger.info(f"Loading matrix from {input_csv}")
     matrix, row_names = load_csv_matrix(input_csv)
-
+    logger.info(f"Matrix loaded with shape: {matrix.shape}")
     # 2. Pipeline
+    logger.info(f"Starting pre-processing")
     inhomogenious_regions, steps = pre_processing(
-        matrix, min_col_quality=min_col_quality, certitude=0.35, error_rate=error_rate
+        matrix, min_col_quality=min_col_quality, certitude=0.2, error_rate=error_rate
     )
+    logger.info(f"Pre-processing done")
+    logger.info(f"Starting ILP")
     # For now, use the original matrix as binary matrix (assuming it's already binary)
     matrix_bin = matrix
     steps, metrics_ilp = clustering_full_matrix(
         matrix_bin, inhomogenious_regions, steps,
         min_row_quality=min_row_quality, min_col_quality=min_col_quality, error_rate=error_rate
     )
-    logger.debug(f"Steps after ILP: {steps}")
+    logger.info(f"ILP done")
+    logger.info(f"Starting post-processing")
     clusters, reduced_matrix, orphan_reads_names, unused_columns = post_processing(matrix_bin, steps, row_names, distance_thresh=distance_thresh)
+    logger.info(f"Post-processing done")
     row_names = ["read_" + str(i) for i in range(len(clusters))]
     col_names = ["strip_" + str(i) for i in range(len(steps))]
     logger.debug(f"Row names: {row_names}")
@@ -52,7 +58,7 @@ def compact_matrix(
     logger.debug(f"Reduced matrix: {reduced_matrix}")
     # 3. Sauvegarde
     write_matrix_csv(reduced_matrix, row_names, col_names, output_csv)
-
+    logger.info(f"Matrix saved to {output_csv}")
     # 4. Métriques de compression
     nb_reads = len(matrix)
     nb_positions = len(matrix[0]) if len(matrix) > 0 else 0
@@ -68,6 +74,7 @@ def compact_matrix(
     percent_positions_used = nb_positions_used / nb_positions if nb_positions > 0 else 0
     nb_reads_per_cluster = [len(cluster) for cluster in clusters]
     nb_positions_per_strip = [len(strip[2]) for strip in steps]
+
     metrics = {
         "nb_clusters": nb_clusters,
         "nb_inhomogenious_regions": len(inhomogenious_regions),
@@ -90,8 +97,13 @@ def compact_matrix(
         "strip_size_max": max(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "strip_size_mean": sum(nb_positions_per_strip)/len(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "list_of_steps": steps,
-        "list_of_clusters": clusters,
     }
+    # Ajout des noms de reads pour chaque cluster, formaté joliment
+    for i, cluster in enumerate(clusters):
+        read_names_list = [str(name) for name in cluster]
+        metrics[f"read_{i}"] = read_names_list
+    for i, strip in enumerate(steps):
+        metrics[f"strip_{i}"] = list(strip[2])
     # Ajout des métriques ILP
     if metrics_ilp:
         metrics.update(metrics_ilp)
