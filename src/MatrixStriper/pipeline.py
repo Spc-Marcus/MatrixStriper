@@ -1,15 +1,16 @@
 from pre_processing import pre_processing
-from clustering import clustering_full_matrix
+from clustering import clustering_full_matrix,largest_only_ilp
 from post_processing import post_processing
-from utils import load_csv_matrix, write_matrix_csv
+from utils import load_csv_matrix, write_matrix_csv, save_dict_with_metadata
 
 def compact_matrix(
     input_csv,
+    output_txt,
     output_csv,
     min_col_quality=3,
     min_row_quality=5,
     error_rate=0.025,
-    distance_thresh=0.1
+    distance_thresh=0.1,
 ) -> dict:
     """
     Orchestration du pipeline de biclustering et compactage de matrice.
@@ -86,6 +87,7 @@ def compact_matrix(
     # Ajout des métriques ILP
     if metrics_ilp:
         metrics.update(metrics_ilp)
+    save_dict_with_metadata(metrics, output_txt)
     return metrics 
 
 

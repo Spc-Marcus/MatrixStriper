@@ -1,4 +1,4 @@
-from .ilp import * 
+from ilp.ilp_pulp import find_quasi_biclique_max_ones_comp as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
@@ -200,8 +200,8 @@ def largest_only(input_matrix: np.ndarray,
        keep it if it is the largest found so far.
     4. Return the indices of the rows and columns of the largest dense submatrix found, or empty lists if none found.
     """
-    # Appel à find_quasi_biclique pour trouver le plus grand quasi-biclique de 1s
-    row_indices, col_indices, found = find_quasi_biclique(input_matrix, error_rate)
+    # Appel à ilp pour trouver le plus grand quasi-biclique de 1s
+    row_indices, col_indices, found = ilp(input_matrix, error_rate)
 
     # Vérification des critères de qualité
     nb_rows = len(row_indices)
@@ -341,10 +341,10 @@ def clustering_step(input_matrix: np.ndarray,
         # Apply quasi-biclique detection on appropriate matrix
         if clustering_1:
             # Search for positive patterns (dense regions of 1s)
-            rw, cl, status = find_quasi_biclique(matrix1[remain_rows][:, current_cols], error_rate)
+            rw, cl, status = ilp(matrix1[remain_rows][:, current_cols], error_rate)
         else:
             # Search for negative patterns (dense regions of 0s in original)
-            rw, cl, status = find_quasi_biclique(matrix0[remain_rows][:, current_cols], error_rate)
+            rw, cl, status = ilp(matrix0[remain_rows][:, current_cols], error_rate)
         nb_ilp_steps += 1
              
         # Convert local indices back to global matrix coordinates
