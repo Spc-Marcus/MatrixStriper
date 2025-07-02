@@ -150,9 +150,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
     return valid_steps, metrics
 
 def largest_only(input_matrix: np.ndarray,
-                 error_rate: float = 0.025,
-                 min_row_quality: int = 5,
-                 min_col_quality: int = 3,) -> (Tuple[List[int], List[int]], dict):
+                 error_rate: float = 0.025,) -> (Tuple[List[int], List[int]], dict):
     """
     Extract the largest dense submatrix (quasi-biclique of 1s) from a binary matrix.
 
@@ -200,7 +198,45 @@ def largest_only(input_matrix: np.ndarray,
        keep it if it is the largest found so far.
     4. Return the indices of the rows and columns of the largest dense submatrix found, or empty lists if none found.
     """
-    pass
+    # Appel à find_quasi_biclique pour trouver le plus grand quasi-biclique de 1s
+    row_indices, col_indices, found = find_quasi_biclique(input_matrix, error_rate)
+
+    # Vérification des critères de qualité
+    nb_rows = len(row_indices)
+    nb_cols = len(col_indices)
+    submatrix_size = nb_rows * nb_cols
+    density = -1
+    if nb_rows > 0 and nb_cols > 0:
+        submatrix = input_matrix[np.ix_(row_indices, col_indices)]
+        density = submatrix.sum() / submatrix_size if submatrix_size > 0 else 0
+    else:
+        found = False
+
+    # On ne garde que si on respecte les critères de taille et de densité
+    if (
+        found and
+        density >= 1 - error_rate
+    ):
+        result = (row_indices, col_indices)
+        found = True
+    else:
+        result = ([], [])
+        found = False
+        nb_rows = 0
+        nb_cols = 0
+        density = -1
+        submatrix_size = 0
+
+    metrics = {
+        "nb_rows": nb_rows,
+        "nb_cols": nb_cols,
+        "density": density,
+        "found": found,
+        "row_indices": row_indices if found else [],
+        "col_indices": col_indices if found else [],
+        "submatrix_size": submatrix_size,
+    }
+    return result, metrics
 
 
 def clustering_step(input_matrix: np.ndarray,
