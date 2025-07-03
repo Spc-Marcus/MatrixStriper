@@ -33,7 +33,7 @@ def suppress_gurobi_output():
         sys.stdout = old_stdout
         sys.stderr = old_stderr
 
-def find_quasi_biclique_max_ones_comp(
+def find_quasi_dens_matrix_max_ones_comp(
     input_matrix: np.ndarray,
     error_rate: float = 0.025
 ) -> Tuple[List[int], List[int], bool]:

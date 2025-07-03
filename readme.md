@@ -1,5 +1,51 @@
 # MatrixStriper
 
+## Démarrage rapide
+
+### Installation
+
+Assurez-vous d'avoir Python 3.8+ et les dépendances installées (voir `env_Windows.yaml` ou `setup.py`).
+
+```bash
+# (Optionnel) Créez un environnement virtuel
+python -m venv venv
+source venv/bin/activate  # ou venv\Scripts\activate sous Windows
+
+# Installez les dépendances
+pip install -r requirements.txt  # ou utilisez conda avec env_Windows.yaml
+
+# Installez le module en mode développement (recommandé pour le développement)
+pip install -e .
+```
+
+### Lancement en ligne de commande
+
+Pour lancer le pipeline principal sur une matrice CSV :
+
+```bash
+python -m src.MatrixStriper <input_csv> <output_txt> <output_csv> [options]
+```
+
+- `<input_csv>` : Chemin du fichier CSV d'entrée (matrice binaire)
+- `<output_txt>` : Chemin du fichier texte pour les métriques
+- `<output_csv>` : Chemin du fichier CSV de sortie (matrice réduite)
+
+**Options principales :**
+- `--largest_only` : Ne calcul que la plus grande sous-matrice dense
+- `--min_col_quality N` : Qualité minimale des colonnes (défaut : 3)
+- `--min_row_quality N` : Qualité minimale des lignes (défaut : 5)
+- `--error_rate X` : Taux d'erreur toléré (défaut : 0.025)
+- `--distance_thresh X` : Seuil de fusion des clusters (défaut : 0.01)
+- `--certitude X` : Seuil de certitude pour la binarisation (défaut : 0.3)
+- `--debug 0|1|2` : Niveau de log (0=WARNING, 1=INFO, 2=DEBUG)
+
+**Exemple :**
+```bash
+python -m src.MatrixStriper data/mat_test.csv res.txt res.csv --min_col_quality 3 --min_row_quality 5 --error_rate 0.025
+```
+
+---
+
 MatrixStriper est un module Python destiné à l'identification, la segmentation et le compactage de motifs binaires homogènes ("strips") dans des matrices de données, typiquement utilisées en bioinformatique (par exemple, matrices de variants, lectures de séquençage, etc.).
 
 ## Objectif du module
