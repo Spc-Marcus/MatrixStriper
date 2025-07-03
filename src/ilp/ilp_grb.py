@@ -3,9 +3,9 @@ import os
 import numpy as np
 from typing import List, Tuple
 # Configuration cloud Gurobi : ces variables d'environnement doivent être définies AVANT l'import de gurobipy
-os.environ['GRB_WLSACCESSID'] = 'af4b8280-70cd-47bc-aeef-69ecf14ecd10'
-os.environ['GRB_WLSSECRET'] = '04da6102-8eb3-4e38-ba06-660ea8f87bf2'
-os.environ['GRB_LICENSEID'] = '2669217'
+# os.environ['GRB_WLSACCESSID'] = 'af4b8280-70cd-47bc-aeef-69ecf14ecd10'
+# os.environ['GRB_WLSSECRET'] = '04da6102-8eb3-4e38-ba06-660ea8f87bf2'
+# os.environ['GRB_LICENSEID'] = '2669217'
 from model.max_one_grb import max_Ones_comp_gurobi
 from model.max_e_r_grb import MaxERSolver
 import contextlib
@@ -66,7 +66,7 @@ def find_quasi_biclique_max_ones_comp(
                 seed_cols = y
     try:
         # --- PHASE 1: SEED ---
-        seed_row_indices = rows_sorted[:seed_rows]
+        seed_row_indices = rows_sorted
         seed_col_indices = cols_sorted[:seed_cols]
         row_degrees = np.sum(X_problem[seed_row_indices, :][:, seed_col_indices] == 1, axis=1)
         col_degrees = np.sum(X_problem[seed_row_indices, :][:, seed_col_indices] == 1, axis=0)
@@ -196,15 +196,16 @@ def find_quasi_biclique_max_e_r_wr(
     zeros_count = np.sum(X_problem == 0)
     initial_density = ones_count / X_problem.size
     logger.debug(f"[GRB] Initial matrix stats: {ones_count} ones, {zeros_count} zeros, density={initial_density:.4f}")
+    
     try:
         row_sums = X_problem.sum(axis=1)
         col_sums = X_problem.sum(axis=0)
         cols_sorted = np.argsort(col_sums)[::-1]
         rows_sorted = np.argsort(row_sums)[::-1]
-        seed_rows = max(n_rows // 3, 2)
         seed_cols = max(n_cols // 3, 2)
-        logger.debug(f"[GRB] Seed region size: {seed_rows} rows x {seed_cols} columns")
-        seed_row_indices = rows_sorted[:seed_rows]
+    
+        logger.debug(f"[GRB] Seed region size: {seed_cols} columns")
+        seed_row_indices = rows_sorted
         seed_col_indices = cols_sorted[:seed_cols]
         seed_matrix = X_problem[np.ix_(seed_row_indices, seed_col_indices)]
         row_degrees = np.sum(seed_matrix == 1, axis=1)
@@ -235,20 +236,21 @@ def find_quasi_biclique_max_e_r_wr(
         seed_solution_matrix = X_problem[np.ix_(rw, cl)]
         seed_solution_density = np.sum(seed_solution_matrix == 1) / seed_solution_matrix.size
         logger.debug(f"[GRB] Seed solution density: {seed_solution_density:.4f}")
-        all_row_degrees = np.sum(X_problem == 1, axis=1)
-        all_col_degrees = np.sum(X_problem == 1, axis=0)
-        all_rows_data = [(int(r), int(all_row_degrees[r])) for r in range(n_rows)]
-        all_cols_data = [(int(c), int(all_col_degrees[c])) for c in range(n_cols)]
-        all_edges = []
-        for r in range(n_rows):
+        # --- PHASE 2: EXTENSION COLONNES ---
+        row_degrees = np.sum(X_problem[rw, :] == 1, axis=1)
+        rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
+        col_degrees = np.sum(X_problem[rw, :] == 1, axis=0)
+        cols_data = [(int(c), int(col_degrees[c])) for c in range(n_cols)]
+        edges = []
+        for i, r in enumerate(rw):
             for c in range(n_cols):
                 if X_problem[r, c] == 1:
-                    all_edges.append((int(r), int(c)))
+                    edges.append((int(r), int(c)))
         prev_obj = seed_model.objVal
         full_model = solver.max_e_wr(
-            all_rows_data,
-            all_cols_data,
-            all_edges,
+            rows_data,
+            cols_data,
+            edges,
             rw,
             cl,
             prev_obj,
