@@ -1,4 +1,4 @@
-from ilp.ilp_grb import find_quasi_biclique_max_ones_comp as ilp
+from ilp.ilp_grb import find_quasi_biclique_max_e_r_wr as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
