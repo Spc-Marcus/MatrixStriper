@@ -4,7 +4,7 @@ from .post_processing import post_processing
 from utils.utils import load_csv_matrix, write_matrix_csv, save_dict_with_metadata
 import logging
 logger = logging.getLogger(__name__)
-
+import time
 def compact_matrix(
     input_csv,
     output_txt,
@@ -30,16 +30,21 @@ def compact_matrix(
     Returns:
         dict: Métriques de compression.
     """
+    start_time = time.time()
     # 1. Lecture du CSV
     logger.info(f"Loading matrix from {input_csv}")
     matrix, row_names = load_csv_matrix(input_csv)
     logger.info(f"Matrix loaded with shape: {matrix.shape}")
+    check1_time = time.time()
+    load_time = check1_time - start_time
     # 2. Pipeline
     logger.info(f"Starting pre-processing")
     inhomogenious_regions, steps = pre_processing(
         matrix, min_col_quality=min_col_quality, certitude=0.2, error_rate=error_rate
     )
     logger.info(f"Pre-processing done")
+    check2_time = time.time()
+    pre_processing_time = check2_time - check1_time
     logger.info(f"Starting ILP")
     # For now, use the original matrix as binary matrix (assuming it's already binary)
     matrix_bin = matrix
@@ -48,6 +53,8 @@ def compact_matrix(
         min_row_quality=min_row_quality, min_col_quality=min_col_quality, error_rate=error_rate
     )
     logger.info(f"ILP done")
+    check3_time = time.time()
+    ilp_time = check3_time - check2_time
     logger.info(f"Starting post-processing")
     clusters, reduced_matrix, orphan_reads_names, unused_columns = post_processing(matrix_bin, steps, row_names, distance_thresh=distance_thresh)
     logger.info(f"Post-processing done")
@@ -56,6 +63,8 @@ def compact_matrix(
     logger.debug(f"Row names: {row_names}")
     logger.debug(f"Col names: {col_names}")
     logger.debug(f"Reduced matrix: {reduced_matrix}")
+    check4_time = time.time()
+    post_processing_time = check4_time - check3_time
     # 3. Sauvegarde
     write_matrix_csv(reduced_matrix, row_names, col_names, output_csv)
     logger.info(f"Matrix saved to {output_csv}")
@@ -98,6 +107,18 @@ def compact_matrix(
         "strip_size_mean": sum(nb_positions_per_strip)/len(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "list_of_steps": steps,
     }
+    metrics["time_load"] = load_time
+    metrics["time_pre_processing"] = pre_processing_time
+    metrics["time_ilp"] = ilp_time
+    metrics["time_post_processing"] = post_processing_time
+    metrics["name"] = "pipeline_compact_matrix"
+    metrics["input_csv"] = input_csv
+    metrics["output_txt"] = output_txt
+    metrics["output_csv"] = output_csv
+    metrics["min_col_quality"] = min_col_quality
+    metrics["min_row_quality"] = min_row_quality
+    metrics["error_rate"] = error_rate
+    metrics["distance_thresh"] = distance_thresh
     # Ajout des noms de reads pour chaque cluster, formaté joliment
     for i, cluster in enumerate(clusters):
         read_names_list = [str(name) for name in cluster]
@@ -120,10 +141,19 @@ def pipeline_ilp_largest_only(
     Orchestration du pipeline de biclustering et compactage de matrice avec ILP.
     """
     # 1. Lecture du CSV
+    start_time = time.time()
     matrix, read_names = load_csv_matrix(input_csv)
-    
+    check1_time = time.time()
+    load_time = check1_time - start_time
     # 2. ILP
     res , metrics = largest_only(matrix, error_rate=error_rate)
+    check2_time = time.time()
+    ilp_time = check2_time - check1_time
+    metrics["time_load"] = load_time
+    metrics["time_ilp"] = ilp_time
+    metrics["time_total"] = ilp_time + load_time
+    metrics["name"] = "pipeline_ilp_largest_only"
+    metrics["input_csv"] = input_csv
     # 3. Sauvegarde
     save_dict_with_metadata(metrics, output_txt)
     return metrics

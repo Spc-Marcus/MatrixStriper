@@ -202,8 +202,7 @@ def find_quasi_biclique_max_e_r_wr(
         col_sums = X_problem.sum(axis=0)
         cols_sorted = np.argsort(col_sums)[::-1]
         rows_sorted = np.argsort(row_sums)[::-1]
-        seed_cols = max(n_cols // 3, 2)
-    
+        seed_cols = min(max(n_cols // 3, 2), 75)
         logger.debug(f"[GRB] Seed region size: {seed_cols} columns")
         seed_row_indices = rows_sorted
         seed_col_indices = cols_sorted[:seed_cols]
