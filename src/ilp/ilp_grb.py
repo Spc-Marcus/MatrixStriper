@@ -311,6 +311,7 @@ def find_quasi_biclique_max_e_r_V2(
                 if X_problem[r, c] == 1:
                     edges.append((int(r), int(c)))
         model = MaxERModel(rows_data, cols_data, edges)
+        model.setParam('OutputFlag', 1)
         model.build_max_e_r(3, 3)
         model.add_density_constraints(0)
         model.add_forced_cols_zero(no_use_cols_seed)
@@ -327,7 +328,7 @@ def find_quasi_biclique_max_e_r_V2(
         no_use_rows_seed = [r for r in range(n_rows) if r not in rw]
         model.remove_forced_cols_zero(no_use_cols_seed)
         model.add_forced_rows_zero(no_use_rows_seed)
-        model.add_improvement_constraint(model.objVal)
+        model.add_improvement_constraint(model.ObjVal)
         model.update_density_constraints(error_rate)
         model.optimize()
         if model.status == 2:
