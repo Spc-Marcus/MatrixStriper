@@ -11,6 +11,7 @@ from model.max_e_r_grb import MaxERSolver
 import contextlib
 import sys
 import gurobipy as grb
+from model.max_e_r_V2_grb import MaxERModel
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ def find_quasi_biclique_max_e_r_wr(
         col_sums = X_problem.sum(axis=0)
         cols_sorted = np.argsort(col_sums)[::-1]
         rows_sorted = np.argsort(row_sums)[::-1]
-        seed_cols = min(max(n_cols // 3, 2), 75)
+        seed_cols = max(n_cols // 3, 2)
         logger.debug(f"[GRB] Seed region size: {seed_cols} columns")
         seed_row_indices = rows_sorted
         seed_col_indices = cols_sorted[:seed_cols]
@@ -219,7 +220,7 @@ def find_quasi_biclique_max_e_r_wr(
                 if seed_matrix[i, j] == 1:
                     edges.append((int(r), int(c)))
         solver = MaxERSolver()
-        seed_model = solver.max_e_r(rows_data, cols_data, edges, 0.0025)
+        seed_model = solver.max_e_r(rows_data, cols_data, edges, error_rate)
         seed_model.setParam('OutputFlag', 0)
         seed_model.optimize()
         rw = []
@@ -276,3 +277,74 @@ def find_quasi_biclique_max_e_r_wr(
         logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
         return [], [], False
 
+def find_quasi_biclique_max_e_r_V2(
+    input_matrix: np.ndarray,
+    error_rate: float = 0.025,
+) -> Tuple[List[int], List[int], bool]:
+    """
+    Find a quasi-biclique in a binary matrix using Gurobi with seed-and-extend strategy.
+    Utilise MaxERModel (max_e_r, max_e_wr).
+    """
+    X_problem = input_matrix.copy()
+    n_rows, n_cols = X_problem.shape
+    if n_rows == 0 or n_cols == 0:
+        logger.debug("[GRB] Empty matrix provided to quasi-biclique detection")
+        return [], [], False
+    ones_count = np.sum(X_problem == 1)
+    zeros_count = np.sum(X_problem == 0)
+    initial_density = ones_count / X_problem.size
+    logger.debug(f"[GRB] Initial matrix stats: {ones_count} ones, {zeros_count} zeros, density={initial_density:.4f}")
+
+    try:
+        row_degrees = np.sum(X_problem == 1, axis=1)
+        rows_data = [(r, int(row_degrees[r])) for r in range(n_rows)]
+        col_degrees = np.sum(X_problem == 1, axis=0)
+        cols_data = [(int(c), int(col_degrees[c])) for c in range(n_cols)]
+        edges = []
+        cols_sums = X_problem.sum(axis=0)
+        cols_sorted = np.argsort(cols_sums)[::-1]
+        seed_cols = max(n_cols // 3, 2)
+        no_use_cols_seed = cols_sorted[seed_cols:]
+
+        for r in range(n_rows):
+            for c in range(n_cols):
+                if X_problem[r, c] == 1:
+                    edges.append((int(r), int(c)))
+        model = MaxERModel(rows_data, cols_data, edges)
+        model.build_max_e_r(3, 3)
+        model.add_density_constraints(0)
+        model.add_forced_cols_zero(no_use_cols_seed)
+        model.optimize()
+
+        if model.status == 2:
+            rw = []
+            cl = []
+            for v in model.getVars():
+                if v.VarName.startswith('row_') and v.X > 0.5:
+                    rw.append(int(v.VarName.split('_')[1]))
+                elif v.VarName.startswith('col_') and v.X > 0.5:
+                    cl.append(int(v.VarName.split('_')[1]))
+        no_use_rows_seed = [r for r in range(n_rows) if r not in rw]
+        model.remove_forced_cols_zero(no_use_cols_seed)
+        model.add_forced_rows_zero(no_use_rows_seed)
+        model.add_improvement_constraint(model.objVal)
+        model.update_density_constraints(error_rate)
+        model.optimize()
+        if model.status == 2:
+            rw = []
+            cl = []
+            for v in model.getVars():
+                if v.VarName.startswith('row_') and v.X > 0.5:
+                    rw.append(int(v.VarName.split('_')[1]))
+                elif v.VarName.startswith('col_') and v.X > 0.5:
+                    cl.append(int(v.VarName.split('_')[1]))
+        if rw and cl:
+            selected = X_problem[np.ix_(rw, cl)]
+            density = np.sum(selected == 1) / selected.size
+            logger.debug(f"[GRB] Final quasi-biclique: {len(rw)} rows, {len(cl)} columns, density={density:.4f}")
+            return rw, cl, True
+        logger.debug("[GRB] No valid solution found")
+        return [], [], False
+    except Exception as e:
+        logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
+        return [], [], False

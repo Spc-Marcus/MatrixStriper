@@ -40,8 +40,12 @@ def write_matrix_csv(matrix: np.ndarray, row_names: list, col_names: list, outpu
         col_names (list): Noms des colonnes.
         output_csv (str): Chemin du fichier de sortie.
     """
-    if matrix.size > 0 or len(matrix) == 0 or len(matrix[0]) == 0:
+    if matrix.size == 0 or len(row_names) == 0 or len(col_names) == 0:
         logger.error("[ERROR] La matrice à écrire est vide. Aucune sortie générée.")
+        logger.error(f"Matrix: {matrix}")
+        logger.error(f"Row names: {row_names}")
+        logger.error(f"Col names: {col_names}")
+        logger.error(f"Output CSV: {output_csv}")
         return
 
     # Forcer row_names et col_names à être des listes 1D

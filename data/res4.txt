@@ -1,0 +1,18 @@
+# Sauvegarde de metrique
+# Date et heure : 2025-07-07 16:45:38
+# Nombre de clés : 14
+# ---
+nb_rows: 0
+nb_cols: 0
+density: -1
+found: False
+row_indices: []
+col_indices: []
+submatrix_size: 0
+list_rows_indices: []
+list_cols_indices: []
+time_load: 0.007053852081298828
+time_ilp: 0.011200904846191406
+time_total: 0.018254756927490234
+name: pipeline_ilp_largest_only
+input_csv: data/matrix_edge_248_70000.csv

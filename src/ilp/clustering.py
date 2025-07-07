@@ -1,4 +1,4 @@
-from ilp.ilp_grb import find_quasi_biclique_max_e_r_wr as ilp
+from ilp.ilp_grb import find_quasi_biclique_max_e_r_V2 as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
@@ -6,7 +6,6 @@ logger = logging.getLogger(__name__)
 
 def clustering_full_matrix(input_matrix:np.ndarray, 
         regions :list[int],
-        steps : list[tuple[list[int], list[int], list[int]]], 
         min_row_quality:int=5,
         min_col_quality:int = 3,
         error_rate : float = 0.025) -> tuple[list[tuple[list[int], list[int], list[int]]], dict]:
@@ -25,9 +24,6 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         absence (0).
     regions : List[List[int]]
         List of column indices to process.
-    steps : List[Tuple[List[int], List[int], List[int]]]
-        Pre-existing clustering results to preserve. Each tuple contains
-        (row_indices_group1, row_indices_group2, column_indices).
     min_row_quality : int, optional
         Minimum number of rows required for a cluster to be considered valid.
         Default is 5.
@@ -82,7 +78,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
        - Column set meets minimum quality requirements
     """
     # Initialize result list with existing steps
-    steps_result = steps.copy() if steps else []
+    steps_result = []
     metrics_list = []
     logger.info(f"Starting clustering full matrix")
     logger.info(f"Regions: {regions}")
@@ -103,9 +99,9 @@ def clustering_full_matrix(input_matrix:np.ndarray,
             cols = [remain_cols[c] for c in cols]
                     
             # Check if valid pattern was found
-            if len(cols) == 0:
-                logger.info(f"No more patterns, stop processing this region")
-                status = False  # No more patterns, stop processing this region
+            if len(cols) < min_col_quality:
+                logger.info(f"Step found but with too few columns ({len(cols)}), skipping.")
+                status = False  # Ou continue, selon si tu veux continuer à chercher d'autres patterns
             else:
                 # Save valid clustering step
                 steps_result.append((reads1, reads0, cols))
@@ -113,7 +109,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
 
                     # Remove processed columns from remaining set
                 remain_cols = [c for c in remain_cols if c not in cols]
-                logger.info(f"Steps found =================================================================: {steps_result}")
+                logger.info(f"Steps found: {steps_result}")
                 logger.info(f"Metrics: {metrics_list}")
     # Log clustering results for debugging
     logger.info(f"Number of clustering steps: {len(steps_result)}")

@@ -42,16 +42,18 @@ def compact_matrix(
     inhomogenious_regions, steps = pre_processing(
         matrix, min_col_quality=min_col_quality, certitude=0.2, error_rate=error_rate
     )
+    steps_pre_processing = steps
     logger.info(f"Pre-processing done")
     check2_time = time.time()
     pre_processing_time = check2_time - check1_time
     logger.info(f"Starting ILP")
     # For now, use the original matrix as binary matrix (assuming it's already binary)
     matrix_bin = matrix
-    steps, metrics_ilp = clustering_full_matrix(
-        matrix_bin, inhomogenious_regions, steps,
+    steps_ilp, metrics_ilp = clustering_full_matrix(
+        matrix_bin, inhomogenious_regions,
         min_row_quality=min_row_quality, min_col_quality=min_col_quality, error_rate=error_rate
     )
+    steps = steps_pre_processing + steps_ilp
     logger.info(f"ILP done")
     check3_time = time.time()
     ilp_time = check3_time - check2_time
@@ -72,7 +74,6 @@ def compact_matrix(
     nb_reads = len(matrix)
     nb_positions = len(matrix[0]) if len(matrix) > 0 else 0
     nb_clusters = len(clusters)
-    nb_steps = len(steps)
     nb_orphan_reads = len(orphan_reads_names)
     nb_unused_columns = len(unused_columns)
     nb_reads_clustered = nb_reads - nb_orphan_reads
@@ -87,7 +88,8 @@ def compact_matrix(
     metrics = {
         "nb_clusters": nb_clusters,
         "nb_inhomogenious_regions": len(inhomogenious_regions),
-        "nb_steps": nb_steps,
+        "nb_steps_pre_processing": len(steps_pre_processing),
+        "nb_steps_ilp": len(steps_ilp),
         "nb_reads_per_cluster": nb_reads_per_cluster,
         "nb_positions_per_strip": nb_positions_per_strip,
         "orphan_reads_names": orphan_reads_names,
@@ -105,7 +107,8 @@ def compact_matrix(
         "strip_size_min": min(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "strip_size_max": max(nb_positions_per_strip) if nb_positions_per_strip else 0,
         "strip_size_mean": sum(nb_positions_per_strip)/len(nb_positions_per_strip) if nb_positions_per_strip else 0,
-        "list_of_steps": steps,
+        "list_of_steps_pre_processing": steps_pre_processing,
+        "list_of_steps_ilp": steps_ilp,
     }
     metrics["time_load"] = load_time
     metrics["time_pre_processing"] = pre_processing_time
