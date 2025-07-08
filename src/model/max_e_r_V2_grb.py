@@ -149,3 +149,9 @@ class MaxERModel:
         self._forced_col_constrs = {}
         self._improvement_constr = None
         self._is_built = False 
+
+    def computeIIS(self):
+        self.model.computeIIS()
+
+    def write(self, filename):
+        self.model.write(filename)
