@@ -24,7 +24,6 @@ def compact_matrix(
         min_col_quality (int): Qualité minimale des colonnes.
         min_row_quality (int): Qualité minimale des lignes.
         error_rate (float): Taux d'erreur toléré.
-        certitude (float): Seuil de certitude pour la binarisation.
         distance_thresh (float): Seuil de distance de Hamming pour fusionner.
 
     Returns:

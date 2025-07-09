@@ -321,6 +321,8 @@ def find_quasi_biclique_max_e_r_V2(
         if model.status == 2:
             rw = model.get_selected_rows()
             cl = model.get_selected_cols()
+        else:
+            return [], [], False
         """
         elif model.status == 3:
             model.computeIIS()
@@ -328,8 +330,7 @@ def find_quasi_biclique_max_e_r_V2(
             logger.debug("[GRB] IIS written to model.ilp")
             return [], [], False
         """
-        else:
-            return [], [], False
+        
         # --- PHASE 2: EXTENSION COLONNES ---
         no_use_rows_seed = [r for r in range(n_rows) if r not in rw]
         model.remove_forced_cols_zero(no_use_cols_seed)
