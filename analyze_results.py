@@ -15,7 +15,7 @@ from plot.analyze_results import ResultsAnalyzer
 def main():
     """Fonction principale."""
     # Vérifier si le fichier test_results.csv existe
-    csv_file = "test_results.csv"
+    csv_file = "test_results_0_01.csv"
     
     if not Path(csv_file).exists():
         print(f"Erreur: Le fichier {csv_file} n'existe pas!")

@@ -1,0 +1,68 @@
+=== RAPPORT D'ANALYSE DES RÉSULTATS MATRIXSTRIPER ===
+
+1. STATISTIQUES GÉNÉRALES
+   - Nombre total de matrices: 4533
+   - Haplotypes testés: [np.int64(2), np.int64(3), np.int64(4), np.int64(6), np.int64(8), np.int64(10)]
+   - Temps total d'exécution: 208.26 secondes
+   - Temps moyen par matrice: 0.046 secondes
+
+2. ANALYSE PAR NOMBRE D'HAPLOTYPES
+   2 haplotypes (1028 matrices):
+     - Temps moyen: 0.023s
+     - Clusters moyens: 1.2
+     - Steps moyens: 3.0
+     - Compression moyenne: 0.0003
+     - Reads clusterisés: 99.8%
+     - Positions utilisées: 14.6%
+
+   3 haplotypes (8 matrices):
+     - Temps moyen: 0.008s
+     - Clusters moyens: 1.9
+     - Steps moyens: 0.9
+     - Compression moyenne: 0.0010
+     - Reads clusterisés: 100.0%
+     - Positions utilisées: 73.2%
+
+   4 haplotypes (1057 matrices):
+     - Temps moyen: 0.033s
+     - Clusters moyens: 1.5
+     - Steps moyens: 2.8
+     - Compression moyenne: 0.0003
+     - Reads clusterisés: 99.6%
+     - Positions utilisées: 17.1%
+
+   6 haplotypes (906 matrices):
+     - Temps moyen: 0.042s
+     - Clusters moyens: 2.2
+     - Steps moyens: 3.1
+     - Compression moyenne: 0.0002
+     - Reads clusterisés: 99.0%
+     - Positions utilisées: 16.9%
+
+   8 haplotypes (1129 matrices):
+     - Temps moyen: 0.069s
+     - Clusters moyens: 2.5
+     - Steps moyens: 4.1
+     - Compression moyenne: 0.0003
+     - Reads clusterisés: 99.0%
+     - Positions utilisées: 18.6%
+
+   10 haplotypes (405 matrices):
+     - Temps moyen: 0.084s
+     - Clusters moyens: 2.6
+     - Steps moyens: 3.9
+     - Compression moyenne: 0.0002
+     - Reads clusterisés: 99.4%
+     - Positions utilisées: 15.6%
+
+3. PERFORMANCES
+   - Ratio de compression moyen: 0.0003
+   - Pourcentage moyen de reads clusterisés: 99.4%
+   - Pourcentage moyen de positions utilisées: 16.8%
+   - Nombre moyen de clusters finaux: 1.9
+   - Nombre moyen de steps de pre-processing: 3.3
+
+4. OBSERVATIONS CLÉS
+   - Matrices avec 0 steps: 1029 (22.7%)
+   - Matrices avec 1 cluster final: 2254 (49.7%)
+   - Matrices avec compression parfaite (ratio=0): 1051 (23.2%)

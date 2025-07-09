@@ -44,7 +44,7 @@ def test_matrix_pipeline(
     # 2. Pre-processing
     logger.info(f"Starting pre-processing")
     inhomogenious_regions, steps_pre_processing = pre_processing(
-        matrix, min_col_quality=min_col_quality, certitude=0.2, error_rate=error_rate
+        matrix, min_col_quality=min_col_quality, certitude=0.01, error_rate=error_rate
     )
     logger.info(f"Pre-processing done: {len(steps_pre_processing)} steps found")
     check2_time = time.time()
