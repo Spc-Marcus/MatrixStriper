@@ -186,9 +186,7 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
     if orphan_reads:
         logger.info(f"{len(orphan_reads)} reads are not present in any final cluster and are ignored in the reduced matrix.")
         logger.debug(f"Orphan reads: {orphan_reads}")
-    if unused_columns:
-        logger.info(f"{len(unused_columns)} columns are not used in any step and are not represented in the reduced matrix.")
-        unused_columns = sorted(list(unused_columns))
-        logger.debug(f"Columns not used in any step: {unused_columns}")
+    # Always return unused_columns as a sorted list
+    unused_columns = sorted(list(unused_columns))
     logger.info(f"Post-processing completed: {len(result_clusters)} clusters returned.")
     return result_clusters, reduced_matrix, orphan_reads_names, unused_columns
