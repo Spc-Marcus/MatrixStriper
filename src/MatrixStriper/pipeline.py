@@ -78,7 +78,6 @@ def compact_matrix(
     nb_reads_clustered = nb_reads - nb_orphan_reads
     nb_positions_used = nb_positions - nb_unused_columns
     reduced_shape = reduced_matrix.shape if hasattr(reduced_matrix, 'shape') else (len(reduced_matrix), len(reduced_matrix[0]) if reduced_matrix else 0)
-    compression_ratio = (reduced_shape[0] * reduced_shape[1]) / (nb_reads * nb_positions) if nb_reads > 0 and nb_positions > 0 else 0
     percent_reads_clustered = nb_reads_clustered / nb_reads if nb_reads > 0 else 0
     percent_positions_used = nb_positions_used / nb_positions if nb_positions > 0 else 0
     nb_reads_per_cluster = [len(cluster) for cluster in clusters]
@@ -95,7 +94,6 @@ def compact_matrix(
         "unused_columns": unused_columns,
         "original_matrix_shape": (nb_reads, nb_positions),
         "reduced_matrix_shape": reduced_shape,
-        "compression_ratio": compression_ratio,
         "nb_orphan_reads": nb_orphan_reads,
         "nb_unused_columns": nb_unused_columns,
         "percent_reads_clustered": percent_reads_clustered,

@@ -447,3 +447,21 @@ Pour visualiser une matrice binaire (0/1) générée par MatrixStriper :
 Vous pouvez ainsi visualiser rapidement la structure de vos matrices et mettre en avant les sous-matrices d'intérêt extraites par MatrixStriper.
 
 ---
+
+## Visualisation de matrice (matrix_visualizer.html)
+
+Pour visualiser une matrice binaire (0/1) générée par MatrixStriper :
+
+1. Ouvrez le fichier `matrix_visualizer.html` dans votre navigateur (double-clic ou ouvrir avec Chrome/Firefox).
+2. Glissez-déposez ou sélectionnez un fichier `.csv` contenant la matrice.
+   - Le CSV doit contenir uniquement des 0 et 1, séparés par des virgules.
+3. Après avoir chargé le CSV, une seconde zone d'upload apparaît pour un fichier `.txt` (optionnel).
+   - Ce fichier `.txt` doit être issu d'une exécution MatrixStriper avec l'option `--largest_only` (ex : `res8.txt`).
+   - Il contient les indices de lignes et colonnes (`row_indices`/`col_indices` ou `list_rows_indices`/`list_cols_indices`) à afficher en priorité.
+4. Glissez-déposez ou sélectionnez ce `.txt` : la matrice sera automatiquement réordonnée selon ces indices.
+
+**Résumé** :
+- Zone 1 : chargez le `.csv` (matrice).
+- Zone 2 : chargez le `.txt` (optionnel, pour l'ordre des lignes/colonnes, issu de --largest_only).
+
+Vous pouvez ainsi visualiser rapidement la structure de vos matrices et mettre en avant les sous-matrices d'intérêt extraites par MatrixStriper.
