@@ -361,30 +361,30 @@
         }
         
         function applyTxtIndicesToCurrentMatrix() {
-            // Utilise txtIndices pour réordonner currentMatrix
             if (!txtIndices || !originalMatrix) return;
             let matrix = JSON.parse(JSON.stringify(originalMatrix));
             let reorderedMatrix = matrix;
             let reorderedRowIndices = null;
             let reorderedColIndices = null;
-            if (txtIndices.rowIndices || txtIndices.colIndices) {
-                if (txtIndices.rowIndices) {
-                    const restRows = Array.from({length: matrix.length}, (_, i) => i).filter(i => !txtIndices.rowIndices.includes(i));
-                    reorderedRowIndices = [...txtIndices.rowIndices, ...restRows];
-                } else {
-                    reorderedRowIndices = Array.from({length: matrix.length}, (_, i) => i);
-                }
-                if (txtIndices.colIndices) {
-                    const restCols = Array.from({length: matrix[0].length}, (_, i) => i).filter(i => !txtIndices.colIndices.includes(i));
-                    reorderedColIndices = [...txtIndices.colIndices, ...restCols];
-                } else {
-                    reorderedColIndices = Array.from({length: matrix[0].length}, (_, i) => i);
-                }
-                // Réordonner d'abord les lignes, puis les colonnes
-                reorderedMatrix = reorderedRowIndices.map(i => {
-                    return reorderedColIndices.map(j => matrix[i][j]);
-                });
+
+            // Utilise les indices fournis, complète avec les manquants si besoin
+            if (txtIndices.rowIndices) {
+                // On suppose que les indices sont base 0 (Python)
+                const restRows = Array.from({length: matrix.length}, (_, i) => i).filter(i => !txtIndices.rowIndices.includes(i));
+                reorderedRowIndices = [...txtIndices.rowIndices, ...restRows];
+            } else {
+                reorderedRowIndices = Array.from({length: matrix.length}, (_, i) => i);
             }
+            if (txtIndices.colIndices) {
+                const restCols = Array.from({length: matrix[0].length}, (_, i) => i).filter(i => !txtIndices.colIndices.includes(i));
+                reorderedColIndices = [...txtIndices.colIndices, ...restCols];
+            } else {
+                reorderedColIndices = Array.from({length: matrix[0].length}, (_, i) => i);
+            }
+            // Réordonner d'abord les lignes, puis les colonnes
+            reorderedMatrix = reorderedRowIndices.map(i => {
+                return reorderedColIndices.map(j => matrix[i][j]);
+            });
             currentMatrix = reorderedMatrix;
             currentRows = reorderedMatrix.length;
             currentCols = reorderedMatrix[0].length;
@@ -404,12 +404,49 @@
         function parseTxtFile(file, callback) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                const txt = e.target.result;
-                // Extraction des indices
+                const txt = e.target.result.trim();
+                let rowIndices = null;
+                let colIndices = null;
+
+                // Cas 1 : format avec row_indices/col_indices
                 const rowMatch = txt.match(/row_indices\s*:\s*\[([^\]]*)\]/) || txt.match(/list_rows_indices\s*:\s*\[([^\]]*)\]/);
                 const colMatch = txt.match(/col_indices\s*:\s*\[([^\]]*)\]/) || txt.match(/list_cols_indices\s*:\s*\[([^\]]*)\]/);
-                let rowIndices = rowMatch ? rowMatch[1].split(',').map(x => parseInt(x.trim()) + 1).filter(x => !isNaN(x) && x >= 0) : null;
-                let colIndices = colMatch ? colMatch[1].split(',').map(x => parseInt(x.trim()) + 1).filter(x => !isNaN(x) && x >= 0) : null;
+
+                if (rowMatch) {
+                    rowIndices = rowMatch[1].split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x >= 0);
+                }
+                if (colMatch) {
+                    colIndices = colMatch[1].split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x >= 0);
+                }
+
+                // Cas 2 : format minimaliste (une ou deux lignes)
+                if (!rowIndices && !colIndices) {
+                    const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                    if (lines.length === 1) {
+                        try {
+                            rowIndices = JSON.parse(lines[0]);
+                        } catch (e) {}
+                    } else if (lines.length >= 2) {
+                        try {
+                            rowIndices = JSON.parse(lines[0]);
+                        } catch (e) {}
+                        try {
+                            colIndices = JSON.parse(lines[1]);
+                        } catch (e) {}
+                    }
+                }
+                // Ajout debug
+                console.log("[DEBUG] Indices TXT lus (avant +1):", {rowIndices, colIndices});
+
+                // Décalage +1 si besoin
+                if (rowIndices) {
+                    rowIndices = rowIndices.map(x => x + 1);
+                }
+                if (colIndices) {
+                    colIndices = colIndices.map(x => x + 1);
+                }
+
+                console.log("[DEBUG] Indices TXT utilisés (après +1):", {rowIndices, colIndices});
                 callback({rowIndices, colIndices});
             };
             reader.readAsText(file);

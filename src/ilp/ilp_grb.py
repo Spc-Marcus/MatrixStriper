@@ -6,7 +6,7 @@ from typing import List, Tuple
 # os.environ['GRB_WLSACCESSID'] = 'af4b8280-70cd-47bc-aeef-69ecf14ecd10'
 # os.environ['GRB_WLSSECRET'] = '04da6102-8eb3-4e38-ba06-660ea8f87bf2'
 # os.environ['GRB_LICENSEID'] = '2669217'
-from model.max_one_grb import max_Ones_comp_gurobi
+from model.max_one_grb import max_Ones_gurobi
 from model.max_e_r_grb import MaxERSolver
 import contextlib
 import sys
@@ -34,7 +34,7 @@ def suppress_gurobi_output():
         sys.stdout = old_stdout
         sys.stderr = old_stderr
 
-def find_quasi_dens_matrix_max_ones_comp(
+def find_quasi_dens_matrix_max_ones(
     input_matrix: np.ndarray,
     error_rate: float = 0.025
 ) -> Tuple[List[int], List[int], bool]:
@@ -78,7 +78,7 @@ def find_quasi_dens_matrix_max_ones_comp(
             for j, c in enumerate(seed_col_indices):
                 if X_problem[r, c] == 1:
                     edges.append((int(r), int(c)))
-        model = max_Ones_comp_gurobi(rows_data, cols_data, edges, error_rate)
+        model = max_Ones_gurobi(rows_data, cols_data, edges, 0)
         model.setParam('OutputFlag', 0)
         model.setParam('MIPGap', 0.05)
         model.setParam('TimeLimit', 20)
@@ -114,7 +114,7 @@ def find_quasi_dens_matrix_max_ones_comp(
                 for j, c in enumerate(cl):
                     if X_problem[r, c] == 1:
                         edges.append((int(r), int(c)))
-            model = max_Ones_comp_gurobi(rows_data, cols_data, edges, error_rate)
+            model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
             model.setParam('OutputFlag', 0)
             model.setParam('MIPGap', 0.05)
             model.setParam('TimeLimit', 20)
@@ -150,7 +150,7 @@ def find_quasi_dens_matrix_max_ones_comp(
                 for j, c in enumerate(all_col_indices):
                     if X_problem[r, c] == 1:
                         edges.append((int(r), int(c)))
-            model = max_Ones_comp_gurobi(rows_data, cols_data, edges, error_rate)
+            model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
             model.setParam('OutputFlag', 0)
             model.setParam('MIPGap', 0.05)
             model.setParam('TimeLimit', 180)

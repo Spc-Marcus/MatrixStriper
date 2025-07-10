@@ -1,4 +1,4 @@
-from ilp.ilp_grb import find_quasi_biclique_max_e_r_V2 as ilp
+from ilp.ilp_grb import find_quasi_dens_matrix_max_ones as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
@@ -97,9 +97,12 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                     
                     # Convert local column indices back to global matrix coordinates
             cols = [remain_cols[c] for c in cols]
-                    
+            if len(reads1) + len(reads0) < 0.8 * len(input_matrix[:, remain_cols]):
+                logger.info(f"Column density too low, skipping. Cols: {cols}")
+                status = False
+
             # Check if valid pattern was found
-            if len(cols) < min_col_quality:
+            elif len(cols) < min_col_quality:
                 logger.info(f"Step found but with too few columns ({len(cols)}), skipping.")
                 status = False  # Ou continue, selon si tu veux continuer à chercher d'autres patterns
             else:
@@ -113,6 +116,7 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                 logger.info(f"Metrics: {metrics_list}")
     # Log clustering results for debugging
     logger.info(f"Number of clustering steps: {len(steps_result)}")
+    logger.info(f"columns remaining: {remain_cols}")
     for i, step in enumerate(steps_result):
         logger.info(f"Step {i}: Group1={len(step[0])}, Group0={len(step[1])}, Cols={len(step[2])}")
     
@@ -356,18 +360,20 @@ def clustering_step(input_matrix: np.ndarray,
         # Convert local indices back to global matrix coordinates
         rw = [remain_rows[r] for r in rw]  # Map row indices to original matrix
         cl = [current_cols[c] for c in cl]  # Map column indices to original matrix
-        
-        current_cols = cl  # Update working column set to detected significant columns
-        
-        # Accumulate rows into appropriate pattern group if valid pattern found
-        if status and len(cl) > 0:
-            found = True
-            if len(rw) * len(cl) > max_ilp_cluster_size:
-                max_ilp_cluster_size = len(rw) * len(cl)
-            if clustering_1:
-                rw1.extend(rw)  # Add to positive pattern group
-            else:
-                rw0.extend(rw)  # Add to negative pattern group
+        if len(cl) < min_col_quality:   
+            status = False
+        else:
+            current_cols = cl  # Update working column set to detected significant columns
+            
+            # Accumulate rows into appropriate pattern group if valid pattern found
+            if status and len(cl) > 0:
+                found = True
+                if len(rw) * len(cl) > max_ilp_cluster_size:
+                    max_ilp_cluster_size = len(rw) * len(cl)
+                if clustering_1:
+                    rw1.extend(rw)  # Add to positive pattern group
+                else:
+                    rw0.extend(rw)  # Add to negative pattern group
                 
         # Remove processed rows from remaining set for next iteration
         remain_rows = [r for r in remain_rows if r not in rw]

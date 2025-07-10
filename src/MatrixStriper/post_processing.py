@@ -99,8 +99,36 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
             logger.debug(f"Step {step_idx}, cluster {cluster_idx}: split into {len(clust1)} (reads1) and {len(clust0)} (reads0) reads using cols {cols}.")
         clusters = new_clusters
         logger.info(f"After step {step_idx}: {len(clusters)} clusters.")
+    for cluster_idx, cluster in enumerate(clusters):
+        logger.info(f"Cluster {cluster_idx}: {cluster}")
 
-    # 3. Filtrage des petits clusters
+
+    # 3. Calcul des moyennes de clusters
+    mean_of_clusters = [cluster_mean(cluster, matrix) for cluster in clusters]
+    logger.debug(f"Calculated mean vectors for {len(clusters)} clusters.")
+
+    # 4. Fusion des clusters similaires (agglomératif sur les moyennes)
+    n_before_merge = len(clusters)
+    clusters = merge_similar_clusters(clusters, mean_of_clusters, distance_thresh)
+    logger.info(f"Merged clusters: {n_before_merge} -> {len(clusters)} after agglomerative clustering (distance_thresh={distance_thresh}).")
+
+    # 5. Première réaffectation des reads orphelins
+    mean_of_clusters = [cluster_mean(cluster, matrix) for cluster in clusters]
+    logger.debug(f"Calculated mean vectors for {len(clusters)} clusters.")
+
+    all_clustered = set([r for cluster in clusters for r in cluster])
+    rem_ = []
+    for read in range(len(read_names)):
+        if read not in all_clustered:
+            rem_.append(read)
+    if len(rem_) > 0 and len(clusters) > 0:
+        logger.info(f"First reassignment: reassigning {len(rem_)} orphaned reads to closest clusters.")
+        clusters = reassign_orphans(rem_, clusters, mean_of_clusters, matrix, distance_thresh)
+        mean_of_clusters = [cluster_mean(cluster, matrix) for cluster in clusters]
+    else:
+        logger.info("No orphaned reads to reassign in first pass.")
+    
+    # 6. Filtrage des petits clusters
     rem_ = []
     big_clusters = []
     if min_reads_per_cluster is not None:
@@ -113,29 +141,21 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
         clusters = big_clusters
     else:
         logger.info("No minimum cluster size filtering applied.")
-    # Si pas de filtrage, on garde tous les clusters et rem_ reste vide
-
-    # 4. Calcul des moyennes de clusters
-    mean_of_clusters = [cluster_mean(cluster, matrix) for cluster in clusters]
-    logger.debug(f"Calculated mean vectors for {len(clusters)} clusters.")
-
-    # 5. Réaffectation des reads orphelins
-    all_clustered = set([r for cluster in clusters for r in cluster])
-    for read in range(len(read_names)):
-        if read not in all_clustered:
-            rem_.append(read)
+    
+    # 7. Deuxième réaffectation des reads orphelins (après filtrage)
     if len(rem_) > 0 and len(clusters) > 0:
-        logger.info(f"Reassigning {len(rem_)} orphaned reads to closest clusters.")
-        clusters = reassign_orphans(rem_, clusters, mean_of_clusters, matrix, distance_thresh)
+        logger.info(f"Second reassignment: reassigning {len(rem_)} orphaned reads from filtered clusters.")
         mean_of_clusters = [cluster_mean(cluster, matrix) for cluster in clusters]
+        clusters = reassign_orphans(rem_, clusters, mean_of_clusters, matrix, distance_thresh)
+    elif len(rem_) > 0:
+        logger.info(f"{len(rem_)} reads became orphaned after filtering but no clusters remain to reassign them to.")
     else:
-        logger.info("No orphaned reads to reassign.")
+        logger.info("No orphaned reads after filtering.")
+    
 
-    # 6. Fusion des clusters similaires (agglomératif sur les moyennes)
-    n_before_merge = len(clusters)
-    clusters = merge_similar_clusters(clusters, mean_of_clusters, distance_thresh)
-    logger.info(f"Merged clusters: {n_before_merge} -> {len(clusters)} after agglomerative clustering (distance_thresh={distance_thresh}).")
+    
 
+    
     # 7. Conversion des indices en noms et matrice réduite
     result_clusters = []
     reduced_matrix = []
@@ -155,7 +175,8 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
                 mean_val = np.rint(cluster_matrix.mean()) if cluster_matrix.size > 0 else 0
                 cluster_profile.append(mean_val)
             reduced_matrix.append(cluster_profile)
-            logger.debug(f"Cluster {idx}: {len(cluster)} reads.")
+            logger.info(f"Cluster {idx}: {len(cluster)} reads.")
+            logger.info(f"Cluster {idx}: {cluster}")
     if reduced_matrix:
         reduced_matrix = np.array(reduced_matrix)
         logger.info(f"Reduced matrix shape: {reduced_matrix.shape}")
@@ -168,8 +189,10 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
     orphan_reads_names = [read_names[r] for r in sorted(orphan_reads)]
     if orphan_reads:
         logger.info(f"{len(orphan_reads)} reads are not present in any final cluster and are ignored in the reduced matrix.")
+        logger.info(f"Orphan reads: {orphan_reads}")
     if unused_columns:
         logger.info(f"{len(unused_columns)} columns are not used in any step and are not represented in the reduced matrix.")
-    unused_columns = sorted(list(unused_columns))
+        unused_columns = sorted(list(unused_columns))
+        logger.info(f"Columns not used in any step: {unused_columns}")
     logger.info(f"Post-processing completed: {len(result_clusters)} clusters returned.")
     return result_clusters, reduced_matrix, orphan_reads_names, unused_columns
