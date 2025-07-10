@@ -12,7 +12,6 @@ if __name__ == "__main__":
     parser.add_argument("--min_row_quality", type=int, default=5, help="Qualité minimale des lignes.")
     parser.add_argument("--error_rate", type=float, default=0.025, help="Taux d'erreur toléré.")
     parser.add_argument("--distance_thresh", type=float, default=0.01, help="Seuil de distance de Hamming pour fusionner.")
-    parser.add_argument("--certitude", type=float, default=0.3, help="Seuil de certitude pour la binarisation.")
     parser.add_argument("--debug", type=int, default=0, choices=[0,1,2], help="Niveau de debug: 0=WARNING, 1=INFO, 2=DEBUG")
     args = parser.parse_args()
 
