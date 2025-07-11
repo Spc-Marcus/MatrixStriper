@@ -1,4 +1,4 @@
-from ilp.ilp_grb import find_quasi_dens_matrix_max_ones as ilp
+from ilp.ilp_grb import find_quasi_dens_matrix_max_onesV2 as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
@@ -97,8 +97,8 @@ def clustering_full_matrix(input_matrix:np.ndarray,
                     
                     # Convert local column indices back to global matrix coordinates
             cols = [remain_cols[c] for c in cols]
-            if len(reads1) + len(reads0) < 0.8 * len(input_matrix[:, remain_cols]):
-                logger.info(f"Column coverage too low < 80%, skipping. Cols: {cols}")
+            if len(reads1) + len(reads0) < 0.9 * len(input_matrix[:, remain_cols]):
+                logger.info(f"Column coverage too low < 90%, skipping. Cols: {cols}")
                 status = False
 
             # Check if valid pattern was found
@@ -345,22 +345,32 @@ def clustering_step(input_matrix: np.ndarray,
     clustering_1 = True  # Alternate between positive (True) and negative (False) patterns
     status = True  # Continue while valid patterns are found
     rw1, rw0 = [], []  # Accumulate rows for positive and negative groups
-    
+
+    logger.debug(f"clustering_step: input_matrix shape={input_matrix.shape}, error_rate={error_rate}, min_row_quality={min_row_quality}, min_col_quality={min_col_quality}")
+
     # Iteratively extract patterns until insufficient data remains
     while len(remain_rows) >= min_row_quality and len(current_cols) >= min_col_quality and status:
+        logger.debug(f"clustering_step: Iteration start, remain_rows={len(remain_rows)}, current_cols={len(current_cols)}, clustering_1={clustering_1}")
         # Apply quasi-biclique detection on appropriate matrix
         if clustering_1:
             # Search for positive patterns (dense regions of 1s)
+            logger.debug(f"clustering_step: Running ILP for positive pattern (1s)")
             rw, cl, status = ilp(matrix1[remain_rows][:, current_cols], error_rate)
         else:
             # Search for negative patterns (dense regions of 0s in original)
+            logger.debug(f"clustering_step: Running ILP for negative pattern (0s)")
             rw, cl, status = ilp(matrix0[remain_rows][:, current_cols], error_rate)
         nb_ilp_steps += 1
-             
+
+        logger.debug(f"clustering_step: ILP returned rw={rw}, cl={cl}, status={status}")
+
         # Convert local indices back to global matrix coordinates
         rw = [remain_rows[r] for r in rw]  # Map row indices to original matrix
         cl = [current_cols[c] for c in cl]  # Map column indices to original matrix
+        logger.debug(f"clustering_step: Global rw={rw}, cl={cl}")
+
         if len(cl) < min_col_quality:   
+            logger.debug(f"clustering_step: Too few columns found ({len(cl)}), stopping iteration.")
             status = False
         else:
             current_cols = cl  # Update working column set to detected significant columns
@@ -372,11 +382,14 @@ def clustering_step(input_matrix: np.ndarray,
                     max_ilp_cluster_size = len(rw) * len(cl)
                 if clustering_1:
                     rw1.extend(rw)  # Add to positive pattern group
+                    logger.debug(f"clustering_step: Added {len(rw)} rows to rw1 (positive group).")
                 else:
                     rw0.extend(rw)  # Add to negative pattern group
+                    logger.debug(f"clustering_step: Added {len(rw)} rows to rw0 (negative group).")
                 
         # Remove processed rows from remaining set for next iteration
         remain_rows = [r for r in remain_rows if r not in rw]
+        logger.debug(f"clustering_step: Updated remain_rows, now {len(remain_rows)} rows left.")
         # Alternate pattern detection type for next iteration
         clustering_1 = not clustering_1
         
@@ -388,6 +401,7 @@ def clustering_step(input_matrix: np.ndarray,
     if isinstance(rw1, range):
         rw1 = list(rw1)
     logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
+    logger.debug(f"clustering_step: rw1={rw1}, rw0={rw0}, current_cols={current_cols}")
     if found:
         if len(rw0) > 0:
             submatrix0 = input_matrix[rw0, :][:, current_cols]
@@ -415,4 +429,5 @@ def clustering_step(input_matrix: np.ndarray,
         "density_cluster1": density_cluster1,
         "found": found,
     }
+    logger.debug(f"clustering_step: metrics={metrics}")
     return (rw0, rw1, current_cols), metrics

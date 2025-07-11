@@ -39,7 +39,7 @@ def compact_matrix(
     # 2. Pipeline
     logger.info(f"Starting pre-processing")
     inhomogenious_regions, steps = pre_processing(
-        matrix, min_col_quality=min_col_quality, certitude=0.2, error_rate=error_rate
+        matrix, min_col_quality=min_col_quality, certitude=0.1, error_rate=error_rate
     )
     steps_pre_processing = steps
     logger.info(f"Pre-processing done")

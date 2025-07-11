@@ -34,6 +34,129 @@ def suppress_gurobi_output():
         sys.stdout = old_stdout
         sys.stderr = old_stderr
 
+def find_quasi_dens_matrix_max_onesV2(
+    input_matrix: np.ndarray,
+    error_rate: float = 0.025
+) -> Tuple[List[int], List[int], bool]:
+    """
+    Find a quasi-biclique in a binary matrix using integer linear programming optimization (Gurobi).
+    Utilise max_Ones_comp_gurobi pour la résolution du modèle à chaque étape.
+    """
+    X_problem = input_matrix.copy()
+    n_rows, n_cols = X_problem.shape
+    if n_rows == 0 or n_cols == 0:
+        return [], [], False
+    
+    try:
+        # --- PHASE 1: SEED - Sélection des lignes d'abord ---
+        # Calculer les degrés des lignes et colonnes
+        row_degrees = np.sum(X_problem == 1, axis=1)
+        col_degrees = np.sum(X_problem == 1, axis=0)
+        
+        # Trier les colonnes par degré décroissant pour le seeding
+        cols_sums = X_problem.sum(axis=0)
+        cols_sorted = np.argsort(cols_sums)[::-1]
+        
+        # Déterminer le nombre de colonnes pour le seeding (comme dans V2)
+        seed_cols = min(max(n_cols // 3, min(n_cols, 5)), 50)
+        seed_col_indices = cols_sorted[:seed_cols]
+        
+        # Créer les données pour le modèle avec toutes les lignes et les colonnes de seed
+        rows_data = [(int(r), int(row_degrees[r])) for r in range(n_rows)]
+        cols_data = [(int(c), int(col_degrees[c])) for c in seed_col_indices]
+        
+        # Créer les arêtes pour la matrice de seed
+        edges = []
+        for r in range(n_rows):
+            for c in seed_col_indices:
+                if X_problem[r, c] == 1:
+                    edges.append((int(r), int(c)))
+        
+        # Résoudre le modèle de seed avec densité maximale (error_rate = 0)
+        model = max_Ones_gurobi(rows_data, cols_data, edges, 0)
+        model.setParam('OutputFlag', 0)
+        model.setParam('MIPGap', 0.05)
+        model.setParam('TimeLimit', 20)
+        model.optimize()
+        
+        status = model.Status
+        if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
+            return [], [], False
+        elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
+            rw = []
+            cl = []
+            for v in model.getVars():
+                if v.VarName.startswith('row_') and v.X > 0.5:
+                    rw.append(int(v.VarName.split('_')[1]))
+                elif v.VarName.startswith('col_') and v.X > 0.5:
+                    cl.append(int(v.VarName.split('_')[1]))
+        else:
+            return [], [], False
+        
+        if not rw or not cl:
+            return [], [], False
+        
+        # --- PHASE 2: EXTENSION COLONNES - Ajouter des colonnes sur les lignes sélectionnées ---
+        # Trouver les colonnes restantes qui ne sont pas dans la solution de seed
+        rem_cols = [c for c in range(n_cols) if c not in cl]
+        
+        if len(rw) > 0 and len(rem_cols) > 0:
+            # Calculer les scores des colonnes restantes basés sur les lignes sélectionnées
+            rem_cols_sum = X_problem[rw][:, rem_cols].sum(axis=0)
+            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rw)]
+            
+            if potential_cols:
+                # Ajouter les colonnes potentielles à la solution
+                all_col_indices = cl + potential_cols
+                
+                # Recalculer les degrés pour les nouvelles colonnes
+                row_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=1)
+                col_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=0)
+                
+                rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
+                cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(all_col_indices)]
+                
+                # Créer les nouvelles arêtes
+                edges = []
+                for i, r in enumerate(rw):
+                    for j, c in enumerate(all_col_indices):
+                        if X_problem[r, c] == 1:
+                            edges.append((int(r), int(c)))
+                
+                # Résoudre le modèle étendu avec le taux d'erreur spécifié
+                model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
+                model.setParam('OutputFlag', 0)
+                model.setParam('MIPGap', 0.05)
+                model.setParam('TimeLimit', 180)
+                model.optimize()
+                
+                status = model.Status
+                if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
+                    return [], [], False
+                elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
+                    rw = []
+                    cl = []
+                    for v in model.getVars():
+                        if v.VarName.startswith('row_') and v.X > 0.5:
+                            rw.append(int(v.VarName.split('_')[1]))
+                        elif v.VarName.startswith('col_') and v.X > 0.5:
+                            cl.append(int(v.VarName.split('_')[1]))
+                else:
+                    return [], [], False
+        
+        # Vérifier le statut final
+        if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
+            return [], [], False
+        elif status == grb.GRB.TIME_LIMIT:
+            return rw, cl, True
+        elif status != grb.GRB.OPTIMAL:
+            return [], [], False
+        
+        return rw, cl, True
+    except Exception as e:
+        logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
+        return [], [], False
+
 def find_quasi_dens_matrix_max_ones(
     input_matrix: np.ndarray,
     error_rate: float = 0.025
@@ -96,7 +219,45 @@ def find_quasi_dens_matrix_max_ones(
                     cl.append(int(v.VarName.split('_')[1]))
         else:
             return [], [], False
-        # --- PHASE 2: EXTENSION LIGNES ---
+        
+        # --- PHASE 3: EXTENSION COLONNES ---
+        rem_cols = [c for c in cols_sorted if c not in cl]
+        if len(rw) > 0:
+            rem_cols_sum = X_problem[rw][:, rem_cols].sum(axis=0)
+            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rw)]
+        else:
+            potential_cols = []
+        if potential_cols:
+            all_col_indices = cl + potential_cols
+            row_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=1)
+            rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
+            col_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=0)
+            cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(all_col_indices)]
+            edges = []
+            for i, r in enumerate(rw):
+                for j, c in enumerate(all_col_indices):
+                    if X_problem[r, c] == 1:
+                        edges.append((int(r), int(c)))
+            model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
+            model.setParam('OutputFlag', 0)
+            model.setParam('MIPGap', 0.05)
+            model.setParam('TimeLimit', 180)
+            model.optimize()
+        
+            status = model.Status
+            if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
+                return [], [], False
+            elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
+                rw = []
+                cl = []
+                for v in model.getVars():
+                    if v.VarName.startswith('row_') and v.X > 0.5:
+                        rw.append(int(v.VarName.split('_')[1]))
+                    elif v.VarName.startswith('col_') and v.X > 0.5:
+                        cl.append(int(v.VarName.split('_')[1]))
+            else:
+                return [], [], False
+            # --- PHASE 2: EXTENSION LIGNES ---
         rem_rows = [r for r in rows_sorted if r not in rw]
         if len(cl) > 0:
             rem_rows_sum = X_problem[rem_rows][:, cl].sum(axis=1)
@@ -130,42 +291,7 @@ def find_quasi_dens_matrix_max_ones(
                         rw.append(int(v.VarName.split('_')[1]))
                     elif v.VarName.startswith('col_') and v.X > 0.5:
                         cl.append(int(v.VarName.split('_')[1]))
-            else:
-                return [], [], False
-        # --- PHASE 3: EXTENSION COLONNES ---
-        rem_cols = [c for c in cols_sorted if c not in cl]
-        if len(rw) > 0:
-            rem_cols_sum = X_problem[rw][:, rem_cols].sum(axis=0)
-            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rw)]
-        else:
-            potential_cols = []
-        if potential_cols:
-            all_col_indices = cl + potential_cols
-            row_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=1)
-            rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
-            col_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=0)
-            cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(all_col_indices)]
-            edges = []
-            for i, r in enumerate(rw):
-                for j, c in enumerate(all_col_indices):
-                    if X_problem[r, c] == 1:
-                        edges.append((int(r), int(c)))
-            model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
-            model.setParam('OutputFlag', 0)
-            model.setParam('MIPGap', 0.05)
-            model.setParam('TimeLimit', 180)
-            model.optimize()
-            status = model.Status
-            if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
-                return [], [], False
-            elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-                rw = []
-                cl = []
-                for v in model.getVars():
-                    if v.VarName.startswith('row_') and v.X > 0.5:
-                        rw.append(int(v.VarName.split('_')[1]))
-                    elif v.VarName.startswith('col_') and v.X > 0.5:
-                        cl.append(int(v.VarName.split('_')[1]))
+                logger.debug(f"[DEBUG] PHASE 2: rw={rw}, cl={cl}")
             else:
                 return [], [], False
         status = model.Status
@@ -179,6 +305,7 @@ def find_quasi_dens_matrix_max_ones(
     except Exception as e:
         logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
         return [], [], False
+
 
 def find_quasi_biclique_max_e_r_wr(
     input_matrix: np.ndarray,

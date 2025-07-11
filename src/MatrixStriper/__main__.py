@@ -1,6 +1,5 @@
-import argparse
 import logging
-from .pipeline import compact_matrix, pipeline_ilp_largest_only
+import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pipeline de biclustering et compactage de matrice.")
@@ -15,10 +14,15 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=int, default=0, choices=[0,1,2], help="Niveau de debug: 0=WARNING, 1=INFO, 2=DEBUG")
     args = parser.parse_args()
 
-    # Setup logger
     log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    logging.basicConfig(level=log_levels.get(args.debug, logging.WARNING), format='[%(levelname)s] %(message)s')
+    logging.basicConfig(
+        level=log_levels.get(args.debug, logging.WARNING),
+        format='[%(levelname)s] %(message)s'
+    )
+    from .pipeline import compact_matrix, pipeline_ilp_largest_only
+    
     logger = logging.getLogger("MatrixStriper")
+    logger.setLevel(log_levels.get(args.debug, logging.WARNING))
 
     logger.info("Début du pipeline MatrixStriper")
     logger.debug(f"Arguments: {args}")
@@ -30,13 +34,13 @@ if __name__ == "__main__":
         )
     else:
         metrics = compact_matrix(
-        input_csv=args.input_csv,
-        output_txt=args.output_txt,
-        output_csv=args.output_csv,
-        min_col_quality=args.min_col_quality,
-        min_row_quality=args.min_row_quality,
-        error_rate=args.error_rate,
-        distance_thresh=args.distance_thresh
+            input_csv=args.input_csv,
+            output_txt=args.output_txt,
+            output_csv=args.output_csv,
+            min_col_quality=args.min_col_quality,
+            min_row_quality=args.min_row_quality,
+            error_rate=args.error_rate,
+            distance_thresh=args.distance_thresh
         )
 
     logger.info("Pipeline terminé.")

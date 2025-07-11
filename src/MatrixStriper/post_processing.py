@@ -188,5 +188,7 @@ def post_processing(matrix: np.ndarray, steps: List[Tuple[List[int], List[int], 
         logger.debug(f"Orphan reads: {orphan_reads}")
     # Always return unused_columns as a sorted list
     unused_columns = sorted(list(unused_columns))
+    if len(unused_columns) > 0:
+        logger.info(f"Unused columns: {unused_columns}")
     logger.info(f"Post-processing completed: {len(result_clusters)} clusters returned.")
     return result_clusters, reduced_matrix, orphan_reads_names, unused_columns
