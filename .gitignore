@@ -211,3 +211,9 @@ matrices/
 
 results/
 output/
+
+*.csv
+*.json
+*.txt
+*.log
+.vscode/

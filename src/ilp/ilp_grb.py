@@ -484,3 +484,35 @@ def find_quasi_biclique_max_e_r_V2(
     except Exception as e:
         logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
         return [], [], False
+
+
+def find_quasi_biclique_max_e_r(
+    input_matrix: np.ndarray,
+    error_rate: float = 0.025,
+) -> Tuple[List[int], List[int], bool]:
+    X_problem = input_matrix.copy()
+    row_degrees = np.sum(X_problem == 1, axis=1)
+    col_degrees = np.sum(X_problem == 1, axis=0)
+    rows_data = [(int(r), int(row_degrees[r])) for r in range(X_problem.shape[0])]
+    cols_data = [(int(c), int(col_degrees[c])) for c in range(X_problem.shape[1])]
+    edges = []
+    for r in range(X_problem.shape[0]):
+        for c in range(X_problem.shape[1]):
+            if X_problem[r, c] == 1:
+                edges.append((int(r), int(c)))
+    solver = MaxERSolver()
+    seed_model = solver.max_e_r(rows_data, cols_data, edges, error_rate)
+    seed_model.setParam('OutputFlag', 0)
+    seed_model.optimize()
+    rw = []
+    cl = []
+    for v in seed_model.getVars():
+        if v.VarName.startswith('row_') and v.X > 0.5:
+            rw.append(int(v.VarName.split('_')[1]))
+        elif v.VarName.startswith('col_') and v.X > 0.5:
+            cl.append(int(v.VarName.split('_')[1]))
+    if not rw or not cl:
+        logger.debug("[GRB] No solution found")
+        return [], [], False
+    return rw, cl, True
+
