@@ -6,13 +6,31 @@
 
 Assurez-vous d'avoir Python 3.8+ et les dépendances installées (voir `env_Windows.yaml` ou `setup.py`).
 
+#### Option 1 : Avec Conda (recommandé)
+
 ```bash
-# (Optionnel) Créez un environnement virtuel
+# Créez un environnement conda
+conda create -n strainminer python=3.8+
+conda activate strainminer
+
+# Installez à partir du fichier d'environnement
+conda env create -f env_Windows.yaml
+# ou installez les dépendances manuellement
+conda install numpy pandas scipy scikit-learn matplotlib
+
+# Installez le module en mode développement
+pip install -e .
+```
+
+#### Option 2 : Avec pip et environnement virtuel
+
+```bash
+# Créez un environnement virtuel
 python -m venv venv
 source venv/bin/activate  # ou venv\Scripts\activate sous Windows
 
 # Installez les dépendances
-pip install -r requirements.txt  # ou utilisez conda avec env_Windows.yaml
+pip install -r requirements.txt
 
 # Installez le module en mode développement (recommandé pour le développement)
 pip install -e .

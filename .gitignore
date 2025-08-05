@@ -216,4 +216,5 @@ output/
 *.json
 *.txt
 *.log
+*.png
 .vscode/

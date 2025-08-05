@@ -118,7 +118,7 @@ def is_strip(matrix, column_indices, error_rate=0.025):
         logger.warning(f"Error in strip identification: {e}")
     return False, None
 
-def pre_processing(input_matrix: np.ndarray, min_col_quality: int = 5, default: int = 0, certitude: float = 0.2, error_rate: float = 0.025) -> tuple:
+def pre_processing(input_matrix: np.ndarray, min_col_quality: int = 5, certitude: float = 0.2, error_rate: float = 0.025) -> tuple:
     """
     Pre-processes the input matrix by identifying strips using hierarchical clustering.
     
@@ -135,10 +135,8 @@ def pre_processing(input_matrix: np.ndarray, min_col_quality: int = 5, default: 
         The input matrix to be pre-processed, with shape (m, n).
     min_col_quality : int, optional
         Minimum number of columns required for a region to be considered significant (default is 5).
-    default : int, optional
-        Default value for uncertain entries (default is 0).
     certitude : float, optional
-        Certainty threshold for strip identification (default is 0.35).
+        Certainty threshold for strip identification (default is 0.2).
     error_rate : float, optional
         Error rate threshold for strip identification (default is 0.025).
         
