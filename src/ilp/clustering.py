@@ -1,4 +1,4 @@
-from ilp.ilp_grb import find_quasi_biclique_max_e_r as ilp
+from ilp.ilp_grb import find_quasi_dens_matrix_max_ones as ilp
 from typing import List, Tuple
 import numpy as np
 import logging
