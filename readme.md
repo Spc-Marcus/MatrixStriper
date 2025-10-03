@@ -45,21 +45,22 @@ python -m src.MatrixStriper <input_csv> <output_txt> <output_csv> [options]
 ```
 
 - `<input_csv>` : Chemin du fichier CSV d'entrée (matrice binaire)
-- `<output_txt>` : Chemin du fichier texte pour les métriques
+- `<output_txt>` : Chemin du fichier texte pour les métriques (sauvegarde JSON-like)
 - `<output_csv>` : Chemin du fichier CSV de sortie (matrice réduite)
 
-**Options principales :**
-- `--largest_only` : Ne calcul que la plus grande sous-matrice dense
+Options principales :
+- `--largest_only` : Ne calcule que la plus grande sous-matrice dense (ILP rapide)
 - `--min_col_quality N` : Qualité minimale des colonnes (défaut : 3)
 - `--min_row_quality N` : Qualité minimale des lignes (défaut : 5)
-- `--error_rate X` : Taux d'erreur toléré (défaut : 0.025)
-- `--distance_thresh X` : Seuil de fusion des clusters (défaut : 0.01)
-- `--certitude X` : Seuil de certitude pour la binarisation (défaut : 0.3)
+- `--error_rate X` : Taux d'erreur toléré pour la détection de quasi-bicliques (défaut : 0.025)
+- `--distance_thresh_post X` : Seuil de distance de Hamming pour fusionner des clusters au post-traitement (défaut : 0.01)
+- `--distance_thresh_CH X` : Seuil de certitude / divergence pour les colonnes homogènes en pré-traitement (défaut : 0.05)
 - `--debug 0|1|2` : Niveau de log (0=WARNING, 1=INFO, 2=DEBUG)
+- `--output_txt` et `--output_csv` : chemins de sortie pour métriques et matrice réduite (obligatoires)
 
-**Exemple :**
+Exemple :
 ```bash
-python -m src.MatrixStriper data/mat_test.csv res.txt res.csv --min_col_quality 3 --min_row_quality 5 --error_rate 0.025
+python -m src.MatrixStriper data/mat_test.csv res.txt res.csv --min_col_quality 3 --min_row_quality 5 --error_rate 0.025 --distance_thresh_post 0.01 --distance_thresh_CH 0.05
 ```
 
 ---
@@ -130,10 +131,8 @@ La fonction `pre_processing` a pour objectif de prétraiter une matrice binaire 
   - Matrice d'entrée de forme (m, n), où m est le nombre de lectures et n le nombre de colonnes.
 - `min_col_quality` : `int` (défaut : 5)
   - Nombre minimal de colonnes pour qu'un groupe soit considéré.
-- `default` : `int` (défaut : 0)
-  - Valeur par défaut pour les entrées incertaines (non utilisé directement dans la logique principale).
-- `certitude` : `float` (défaut : 0.2)
-  - Seuil de divergence pour le découpage des clusters de colonnes.
+- `distance_thresh_CH` : `float` (défaut : 0.05)
+  - Seuil de divergence / certitude utilisé pour découper les clusters de colonnes (nom CLI : --distance_thresh_CH).
 - `error_rate` : `float` (défaut : 0.025)
   - Tolérance d'erreur pour l'identification des strips (proportion d'erreurs acceptée dans un cluster homogène) (doit être < 0.5).
 
@@ -154,7 +153,7 @@ import numpy as np
 from src.MatrixStriper.pre_processing import pre_processing
 
 mat = np.random.randint(0, 2, (100, 20))
-ambiguous_cols, strips = pre_processing(mat)
+ambiguous_cols, strips = pre_processing(mat, min_col_quality=3, certitude=0.1, error_rate=0.02)
 print("Colonnes ambiguës :", ambiguous_cols)
 print("Strips identifiés :", strips)
 ```
@@ -190,6 +189,10 @@ La fonction `post_processing` prend le résultat du biclustering (steps) et la m
 - une matrice réduite représentant le profil consensus de chaque cluster sur les stripes (strips) identifiés,
 - la liste des reads orphelins (non clusterisés à la fin),
 - la liste des colonnes non utilisées dans les steps (colonnes non "stripes").
+
+### Paramètres importants ajoutés
+- `distance_thresh` : `float` (défaut : 0.01)
+  - Seuil de Hamming pour fusionner des clusters similaires et pour réaffecter des orphelins (CLI : --distance_thresh_post).
 
 ### Fonctionnement général
 
@@ -227,7 +230,7 @@ La fonction `post_processing` prend le résultat du biclustering (steps) et la m
   - Liste des étapes de biclustering. Chaque step est un tuple `(reads1, reads0, cols)`.
 - `read_names` : `List[str]`
   - Liste des noms de reads (doit correspondre à l'ordre des lignes de la matrice).
-- `distance_thresh` : `float` (défaut : 0.1)
+- `distance_thresh` : `float` (défaut : 0.01)
   - Seuil de distance de Hamming pour fusionner les clusters similaires.
 - `min_reads_per_cluster` : `int | None` (défaut : 5)
   - Taille minimale d'un cluster. Si `None`, aucun filtrage n'est appliqué.
@@ -252,7 +255,7 @@ from src.MatrixStriper.post_processing import post_processing
 matrix = np.array([[1, 0, 1], [0, 1, 1], [1, 1, 0]])
 steps = [([0, 2], [1], [0, 2]), ([1], [0, 2], [1])]
 read_names = ['read1', 'read2', 'read3']
-clusters, reduced, orphan_reads, unused_cols = post_processing(matrix, steps, read_names)
+clusters, reduced, orphan_reads, unused_cols = post_processing(matrix, steps, read_names, min_reads_per_cluster=2, distance_thresh=0.1)
 print("Clusters:", clusters)
 print("Matrice réduite:", reduced)
 print("Reads orphelins:", orphan_reads)
@@ -308,10 +311,8 @@ Réaffecte les reads orphelins au cluster le plus proche (distance de Hamming).
 
 Cette fonction applique un biclustering exhaustif et itératif sur une matrice binaire pour extraire tous les motifs significatifs (séparations de lignes selon des motifs de colonnes). Elle traite chaque région de colonnes indépendamment, applique un clustering binaire, et accumule les étapes valides.
 
-- **Paramètres** :
-  - `input_matrix` : `np.ndarray` — Matrice binaire d'entrée (0/1).
+- **Paramètres clés** :
   - `regions` : `List[List[int]]` — Groupes d'indices de colonnes à traiter séparément.
-  - `steps` : `List[Tuple[List[int], List[int], List[int]]]` — Résultats de clustering préexistants à préserver.
   - `min_row_quality` : `int` — Nombre minimal de lignes pour un cluster valide (défaut : 5).
   - `min_col_quality` : `int` — Nombre minimal de colonnes pour traiter une région (défaut : 3).
   - `error_rate` : `float` — Taux d'erreur toléré pour la détection de motifs (défaut : 0.025).
@@ -371,6 +372,18 @@ Effectue une seule étape de clustering binaire sur une matrice pour identifier 
 
 Cette fonction orchestre l'ensemble du pipeline de biclustering et de compactage de matrice. Elle prend en entrée un fichier CSV de matrice binaire, applique le prétraitement, le biclustering, le post-traitement, puis sauvegarde la matrice réduite et les métriques de compression.
 
+Paramètres notables à contrôler via la CLI :
+- `--min_col_quality`, `--min_row_quality`
+- `--error_rate`, `--distance_thresh_post`, `--distance_thresh_CH`
+- `--largest_only` pour exécuter uniquement la recherche du plus grand quasi-biclique
+
+### Exemple amélioré
+```bash
+python -m src.MatrixStriper data/mat.csv metrics.txt reduced.csv \
+  --min_col_quality 4 --min_row_quality 6 \
+  --error_rate 0.02 --distance_thresh_post 0.01 --distance_thresh_CH 0.12 --debug 1
+```
+
 ### Fonctionnement général
 
 1. **Lecture de la matrice** :
@@ -391,7 +404,8 @@ Cette fonction orchestre l'ensemble du pipeline de biclustering et de compactage
 - `min_col_quality` : `int` (défaut : 3) — Qualité minimale des colonnes.
 - `min_row_quality` : `int` (défaut : 5) — Qualité minimale des lignes.
 - `error_rate` : `float` (défaut : 0.025) — Taux d'erreur toléré.
-- `distance_thresh` : `float` (défaut : 0.1) — Seuil de distance de Hamming pour fusionner les clusters.
+- `distance_thresh_post` : `float` (défaut : 0.01) — Seuil de distance de Hamming pour fusionner les clusters.
+- `distance_thresh_CH` : `float` (défaut : 0.05) — Seuil de divergence pour le découpage des clusters de colonnes.
 
 ### Valeur de retour
 - `dict` : Dictionnaire de métriques de compression (nombre de clusters, ratio de compression, etc).
@@ -466,20 +480,12 @@ Vous pouvez ainsi visualiser rapidement la structure de vos matrices et mettre e
 
 ---
 
-## Visualisation de matrice (matrix_visualizer.html)
+## Notes finales
 
-Pour visualiser une matrice binaire (0/1) générée par MatrixStriper :
+- Les nouveaux paramètres permettent d'affiner le comportement du pipeline à chaque étape (pré-traitement, ILP, post-traitement).
+- Les fichiers de sortie comprennent :
+  - `output_csv` : matrice réduite (clusters x strips)
+  - `output_txt` : métriques détaillées (JSON-like) incluant timings, listes de reads par cluster et paramètres utilisés
+- Pour le développement, activez `--debug 2` pour traces détaillées dans les logs.
 
-1. Ouvrez le fichier `matrix_visualizer.html` dans votre navigateur (double-clic ou ouvrir avec Chrome/Firefox).
-2. Glissez-déposez ou sélectionnez un fichier `.csv` contenant la matrice.
-   - Le CSV doit contenir uniquement des 0 et 1, séparés par des virgules.
-3. Après avoir chargé le CSV, une seconde zone d'upload apparaît pour un fichier `.txt` (optionnel).
-   - Ce fichier `.txt` doit être issu d'une exécution MatrixStriper avec l'option `--largest_only` (ex : `res8.txt`).
-   - Il contient les indices de lignes et colonnes (`row_indices`/`col_indices` ou `list_rows_indices`/`list_cols_indices`) à afficher en priorité.
-4. Glissez-déposez ou sélectionnez ce `.txt` : la matrice sera automatiquement réordonnée selon ces indices.
-
-**Résumé** :
-- Zone 1 : chargez le `.csv` (matrice).
-- Zone 2 : chargez le `.txt` (optionnel, pour l'ordre des lignes/colonnes, issu de --largest_only).
-
-Vous pouvez ainsi visualiser rapidement la structure de vos matrices et mettre en avant les sous-matrices d'intérêt extraites par MatrixStriper.
+Merci d'utiliser MatrixStriper — reportez les bugs et suggestions via le dépôt.

@@ -83,42 +83,42 @@ def find_quasi_dens_matrix_max_onesV2(
         if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
             return [], [], False
         elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-            rw = []
-            cl = []
+            rows_sel = []
+            cols_sel = []
             for v in model.getVars():
                 if v.VarName.startswith('row_') and v.X > 0.5:
-                    rw.append(int(v.VarName.split('_')[1]))
+                    rows_sel.append(int(v.VarName.split('_')[1]))
                 elif v.VarName.startswith('col_') and v.X > 0.5:
-                    cl.append(int(v.VarName.split('_')[1]))
+                    cols_sel.append(int(v.VarName.split('_')[1]))
         else:
             return [], [], False
         
-        if not rw or not cl:
+        if not rows_sel or not cols_sel:
             return [], [], False
         
         # --- PHASE 2: EXTENSION COLONNES - Ajouter des colonnes sur les lignes sélectionnées ---
         # Trouver les colonnes restantes qui ne sont pas dans la solution de seed
-        rem_cols = [c for c in range(n_cols) if c not in cl]
+        rem_cols = [c for c in range(n_cols) if c not in cols_sel]
         
-        if len(rw) > 0 and len(rem_cols) > 0:
+        if len(rows_sel) > 0 and len(rem_cols) > 0:
             # Calculer les scores des colonnes restantes basés sur les lignes sélectionnées
-            rem_cols_sum = X_problem[rw][:, rem_cols].sum(axis=0)
-            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rw)]
+            rem_cols_sum = X_problem[rows_sel][:, rem_cols].sum(axis=0)
+            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rows_sel)]
             
             if potential_cols:
                 # Ajouter les colonnes potentielles à la solution
-                all_col_indices = cl + potential_cols
+                all_col_indices = cols_sel + potential_cols
                 
                 # Recalculer les degrés pour les nouvelles colonnes
-                row_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=1)
-                col_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=0)
+                row_degrees = np.sum(X_problem[rows_sel, :][:, all_col_indices] == 1, axis=1)
+                col_degrees = np.sum(X_problem[rows_sel, :][:, all_col_indices] == 1, axis=0)
                 
-                rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
+                rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rows_sel)]
                 cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(all_col_indices)]
                 
                 # Créer les nouvelles arêtes
                 edges = []
-                for i, r in enumerate(rw):
+                for i, r in enumerate(rows_sel):
                     for j, c in enumerate(all_col_indices):
                         if X_problem[r, c] == 1:
                             edges.append((int(r), int(c)))
@@ -134,13 +134,13 @@ def find_quasi_dens_matrix_max_onesV2(
                 if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
                     return [], [], False
                 elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-                    rw = []
-                    cl = []
+                    rows_sel = []
+                    cols_sel = []
                     for v in model.getVars():
                         if v.VarName.startswith('row_') and v.X > 0.5:
-                            rw.append(int(v.VarName.split('_')[1]))
+                            rows_sel.append(int(v.VarName.split('_')[1]))
                         elif v.VarName.startswith('col_') and v.X > 0.5:
-                            cl.append(int(v.VarName.split('_')[1]))
+                            cols_sel.append(int(v.VarName.split('_')[1]))
                 else:
                     return [], [], False
         
@@ -148,11 +148,11 @@ def find_quasi_dens_matrix_max_onesV2(
         if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
             return [], [], False
         elif status == grb.GRB.TIME_LIMIT:
-            return rw, cl, True
+            return rows_sel, cols_sel, True
         elif status != grb.GRB.OPTIMAL:
             return [], [], False
         
-        return rw, cl, True
+        return rows_sel, cols_sel, True
     except Exception as e:
         logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
         return [], [], False
@@ -210,31 +210,31 @@ def find_quasi_dens_matrix_max_ones(
         if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
             return [], [], False
         elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-            rw = []
-            cl = []
+            rows_sel = []
+            cols_sel = []
             for v in model.getVars():
                 if v.VarName.startswith('row_') and v.X > 0.5:
-                    rw.append(int(v.VarName.split('_')[1]))
+                    rows_sel.append(int(v.VarName.split('_')[1]))
                 elif v.VarName.startswith('col_') and v.X > 0.5:
-                    cl.append(int(v.VarName.split('_')[1]))
+                    cols_sel.append(int(v.VarName.split('_')[1]))
         else:
             return [], [], False
         
         # --- PHASE 3: EXTENSION COLONNES ---
-        rem_cols = [c for c in cols_sorted if c not in cl]
-        if len(rw) > 0:
-            rem_cols_sum = X_problem[rw][:, rem_cols].sum(axis=0)
-            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rw)]
+        rem_cols = [c for c in cols_sorted if c not in cols_sel]
+        if len(rows_sel) > 0:
+            rem_cols_sum = X_problem[rows_sel][:, rem_cols].sum(axis=0)
+            potential_cols = [c for idx, c in enumerate(rem_cols) if rem_cols_sum[idx] > 0.9 * len(rows_sel)]
         else:
             potential_cols = []
         if potential_cols:
-            all_col_indices = cl + potential_cols
-            row_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=1)
-            rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
-            col_degrees = np.sum(X_problem[rw, :][:, all_col_indices] == 1, axis=0)
+            all_col_indices = cols_sel + potential_cols
+            row_degrees = np.sum(X_problem[rows_sel, :][:, all_col_indices] == 1, axis=1)
+            rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rows_sel)]
+            col_degrees = np.sum(X_problem[rows_sel, :][:, all_col_indices] == 1, axis=0)
             cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(all_col_indices)]
             edges = []
-            for i, r in enumerate(rw):
+            for i, r in enumerate(rows_sel):
                 for j, c in enumerate(all_col_indices):
                     if X_problem[r, c] == 1:
                         edges.append((int(r), int(c)))
@@ -248,31 +248,31 @@ def find_quasi_dens_matrix_max_ones(
             if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
                 return [], [], False
             elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-                rw = []
-                cl = []
+                rows_sel = []
+                cols_sel = []
                 for v in model.getVars():
                     if v.VarName.startswith('row_') and v.X > 0.5:
-                        rw.append(int(v.VarName.split('_')[1]))
+                        rows_sel.append(int(v.VarName.split('_')[1]))
                     elif v.VarName.startswith('col_') and v.X > 0.5:
-                        cl.append(int(v.VarName.split('_')[1]))
+                        cols_sel.append(int(v.VarName.split('_')[1]))
             else:
                 return [], [], False
             # --- PHASE 2: EXTENSION LIGNES ---
-        rem_rows = [r for r in rows_sorted if r not in rw]
-        if len(cl) > 0:
-            rem_rows_sum = X_problem[rem_rows][:, cl].sum(axis=1)
-            potential_rows = [r for idx, r in enumerate(rem_rows) if rem_rows_sum[idx] > 0.5 * len(cl)]
+        rem_rows = [r for r in rows_sorted if r not in rows_sel]
+        if len(cols_sel) > 0:
+            rem_rows_sum = X_problem[rem_rows][:, cols_sel].sum(axis=1)
+            potential_rows = [r for idx, r in enumerate(rem_rows) if rem_rows_sum[idx] > 0.5 * len(cols_sel)]
         else:
             potential_rows = []
         if potential_rows:
-            all_row_indices = rw + potential_rows
-            row_degrees = np.sum(X_problem[all_row_indices, :][:, cl] == 1, axis=1)
+            all_row_indices = rows_sel + potential_rows
+            row_degrees = np.sum(X_problem[all_row_indices, :][:, cols_sel] == 1, axis=1)
             rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(all_row_indices)]
-            col_degrees = np.sum(X_problem[all_row_indices, :][:, cl] == 1, axis=0)
-            cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(cl)]
+            col_degrees = np.sum(X_problem[all_row_indices, :][:, cols_sel] == 1, axis=0)
+            cols_data = [(int(c), int(col_degrees[i])) for i, c in enumerate(cols_sel)]
             edges = []
             for i, r in enumerate(all_row_indices):
-                for j, c in enumerate(cl):
+                for j, c in enumerate(cols_sel):
                     if X_problem[r, c] == 1:
                         edges.append((int(r), int(c)))
             model = max_Ones_gurobi(rows_data, cols_data, edges, error_rate)
@@ -284,24 +284,24 @@ def find_quasi_dens_matrix_max_ones(
             if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
                 return [], [], False
             elif status == grb.GRB.TIME_LIMIT or status == grb.GRB.OPTIMAL:
-                rw = []
-                cl = []
+                rows_sel = []
+                cols_sel = []
                 for v in model.getVars():
                     if v.VarName.startswith('row_') and v.X > 0.5:
-                        rw.append(int(v.VarName.split('_')[1]))
+                        rows_sel.append(int(v.VarName.split('_')[1]))
                     elif v.VarName.startswith('col_') and v.X > 0.5:
-                        cl.append(int(v.VarName.split('_')[1]))
-                logger.debug(f"[DEBUG] PHASE 2: rw={rw}, cl={cl}")
+                        cols_sel.append(int(v.VarName.split('_')[1]))
+                logger.debug(f"[DEBUG] PHASE 2: rows_sel={rows_sel}, cols_sel={cols_sel}")
             else:
                 return [], [], False
         status = model.Status
         if status in (grb.GRB.INF_OR_UNBD, grb.GRB.INFEASIBLE, grb.GRB.UNBOUNDED):
             return [], [], False
         elif status == grb.GRB.TIME_LIMIT:
-            return rw, cl, True
+            return rows_sel, cols_sel, True
         elif status != grb.GRB.OPTIMAL:
             return [], [], False
-        return rw, cl, True
+        return rows_sel, cols_sel, True
     except Exception as e:
         logger.error(f"[GRB] Critical error in quasi-biclique detection: {str(e)}")
         return [], [], False
@@ -350,26 +350,26 @@ def find_quasi_biclique_max_e_r_wr(
         seed_model = solver.max_e_r(rows_data, cols_data, edges, error_rate)
         seed_model.setParam('OutputFlag', 0)
         seed_model.optimize()
-        rw = []
-        cl = []
+        rows_sel = []
+        cols_sel = []
         for v in seed_model.getVars():
             if v.VarName.startswith('row_') and v.X > 0.5:
-                rw.append(int(v.VarName.split('_')[1]))
+                rows_sel.append(int(v.VarName.split('_')[1]))
             elif v.VarName.startswith('col_') and v.X > 0.5:
-                cl.append(int(v.VarName.split('_')[1]))
-        if not rw or not cl:
+                cols_sel.append(int(v.VarName.split('_')[1]))
+        if not rows_sel or not cols_sel:
             logger.debug("[GRB] No solution found in seed phase")
             return [], [], False
-        seed_solution_matrix = X_problem[np.ix_(rw, cl)]
+        seed_solution_matrix = X_problem[np.ix_(rows_sel, cols_sel)]
         seed_solution_density = np.sum(seed_solution_matrix == 1) / seed_solution_matrix.size
         logger.debug(f"[GRB] Seed solution density: {seed_solution_density:.4f}")
         # --- PHASE 2: EXTENSION COLONNES ---
-        row_degrees = np.sum(X_problem[rw, :] == 1, axis=1)
-        rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rw)]
-        col_degrees = np.sum(X_problem[rw, :] == 1, axis=0)
+        row_degrees = np.sum(X_problem[rows_sel, :] == 1, axis=1)
+        rows_data = [(int(r), int(row_degrees[i])) for i, r in enumerate(rows_sel)]
+        col_degrees = np.sum(X_problem[rows_sel, :] == 1, axis=0)
         cols_data = [(int(c), int(col_degrees[c])) for c in range(n_cols)]
         edges = []
-        for i, r in enumerate(rw):
+        for i, r in enumerate(rows_sel):
             for c in range(n_cols):
                 if X_problem[r, c] == 1:
                     edges.append((int(r), int(c)))
@@ -378,26 +378,26 @@ def find_quasi_biclique_max_e_r_wr(
             rows_data,
             cols_data,
             edges,
-            rw,
-            cl,
+            rows_sel,
+            cols_sel,
             prev_obj,
             error_rate
         )
         full_model.setParam('OutputFlag', 0)
         full_model.optimize()
         if full_model.status == 2:  # GRB.OPTIMAL
-            rw = []
-            cl = []
+            rows_sel = []
+            cols_sel = []
             for v in full_model.getVars():
                 if v.VarName.startswith('row_') and v.X > 0.5:
-                    rw.append(int(v.VarName.split('_')[1]))
+                    rows_sel.append(int(v.VarName.split('_')[1]))
                 elif v.VarName.startswith('col_') and v.X > 0.5:
-                    cl.append(int(v.VarName.split('_')[1]))
-        if rw and cl:
-            selected = X_problem[np.ix_(rw, cl)]
+                    cols_sel.append(int(v.VarName.split('_')[1]))
+        if rows_sel and cols_sel:
+            selected = X_problem[np.ix_(rows_sel, cols_sel)]
             density = np.sum(selected == 1) / selected.size
-            logger.debug(f"[GRB] Final quasi-biclique: {len(rw)} rows, {len(cl)} columns, density={density:.4f}")
-            return rw, cl, True
+            logger.debug(f"[GRB] Final quasi-biclique: {len(rows_sel)} rows, {len(cols_sel)} columns, density={density:.4f}")
+            return rows_sel, cols_sel, True
         logger.debug("[GRB] No valid solution found")
         return [], [], False
     except Exception as e:
@@ -446,8 +446,8 @@ def find_quasi_biclique_max_e_r_V2(
         model.optimize()
 
         if model.status == 2:
-            rw = model.get_selected_rows()
-            cl = model.get_selected_cols()
+            rows_sel = model.get_selected_rows()
+            cols_sel = model.get_selected_cols()
         else:
             return [], [], False
         """
@@ -459,26 +459,26 @@ def find_quasi_biclique_max_e_r_V2(
         """
         
         # --- PHASE 2: EXTENSION COLONNES ---
-        no_use_rows_seed = [r for r in range(n_rows) if r not in rw]
+        no_use_rows_seed = [r for r in range(n_rows) if r not in rows_sel]
         model.remove_forced_cols_zero(no_use_cols_seed)
         model.add_forced_rows_zero(no_use_rows_seed)
         model.add_improvement_constraint(model.ObjVal)
         model.update_density_constraints(error_rate)
         model.optimize()
         if model.status == 2:
-            rw = model.get_selected_rows()
-            cl = model.get_selected_cols()
+            rows_sel = model.get_selected_rows()
+            cols_sel = model.get_selected_cols()
         """
         elif model.status == 3:
             model.computeIIS()
             model.write("model.ilp")
             logger.debug("[GRB] IIS written to model.ilp")"""
         
-        if rw and cl:
-            selected = X_problem[np.ix_(rw, cl)]
+        if rows_sel and cols_sel:
+            selected = X_problem[np.ix_(rows_sel, cols_sel)]
             density = np.sum(selected == 1) / selected.size
-            logger.debug(f"[GRB] Final quasi-biclique: {len(rw)} rows, {len(cl)} columns, density={density:.4f}")
-            return rw, cl, True
+            logger.debug(f"[GRB] Final quasi-biclique: {len(rows_sel)} rows, {len(cols_sel)} columns, density={density:.4f}")
+            return rows_sel, cols_sel, True
         logger.debug("[GRB] No valid solution found")
         return [], [], False
     except Exception as e:
@@ -504,15 +504,15 @@ def find_quasi_biclique_max_e_r(
     seed_model = solver.max_e_r(rows_data, cols_data, edges, error_rate)
     seed_model.setParam('OutputFlag', 0)
     seed_model.optimize()
-    rw = []
-    cl = []
+    rows_sel = []
+    cols_sel = []
     for v in seed_model.getVars():
         if v.VarName.startswith('row_') and v.X > 0.5:
-            rw.append(int(v.VarName.split('_')[1]))
+            rows_sel.append(int(v.VarName.split('_')[1]))
         elif v.VarName.startswith('col_') and v.X > 0.5:
-            cl.append(int(v.VarName.split('_')[1]))
-    if not rw or not cl:
+            cols_sel.append(int(v.VarName.split('_')[1]))
+    if not rows_sel or not cols_sel:
         logger.debug("[GRB] No solution found")
         return [], [], False
-    return rw, cl, True
+    return rows_sel, cols_sel, True
 

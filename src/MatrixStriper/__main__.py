@@ -10,7 +10,8 @@ if __name__ == "__main__":
     parser.add_argument("--min_col_quality", type=int, default=3, help="Qualité minimale des colonnes.")
     parser.add_argument("--min_row_quality", type=int, default=5, help="Qualité minimale des lignes.")
     parser.add_argument("--error_rate", type=float, default=0.025, help="Taux d'erreur toléré.")
-    parser.add_argument("--distance_thresh", type=float, default=0.01, help="Seuil de distance de Hamming pour fusionner.")
+    parser.add_argument("--distance_thresh_post", type=float, default=0.01, help="Seuil de distance de Hamming pour fusionner.")
+    parser.add_argument("--distance_thresh_CH", type=float, default=0.05, help="Seuil de certitude pour les colonnes homogènes.")
     parser.add_argument("--debug", type=int, default=0, choices=[0,1,2], help="Niveau de debug: 0=WARNING, 1=INFO, 2=DEBUG")
     args = parser.parse_args()
 
@@ -40,7 +41,8 @@ if __name__ == "__main__":
             min_col_quality=args.min_col_quality,
             min_row_quality=args.min_row_quality,
             error_rate=args.error_rate,
-            distance_thresh=args.distance_thresh
+            distance_thresh_post=args.distance_thresh_post,
+            distance_thresh_CH=args.distance_thresh_CH
         )
 
     logger.info("Pipeline terminé.")

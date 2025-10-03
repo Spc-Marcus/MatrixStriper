@@ -90,28 +90,28 @@ def clustering_full_matrix(input_matrix:np.ndarray,
         # Iteratively extract patterns until no more significant ones found
         while len(remain_cols) >= min_col_quality and status:
                     # Apply clustering to current remaining columns
-            (reads1, reads0, cols), metricclustering_steps = clustering_step(input_matrix[:, remain_cols], 
+            (rows_pos, rows_neg, cols_sel), metrics_step = clustering_step(input_matrix[:, remain_cols], 
                                                           error_rate=error_rate,
                                                           min_row_quality=min_row_quality, 
                                                           min_col_quality=min_col_quality)
                     
-                    # Convert local column indices back to global matrix coordinates
-            cols = [remain_cols[c] for c in cols]
-            if len(reads1) + len(reads0) < 0.9 * len(input_matrix[:, remain_cols]):
-                logger.info(f"Column coverage too low < 90%, skipping. Cols: {cols}")
+            # Convert local column indices back to global matrix coordinates
+            cols_sel = [remain_cols[c] for c in cols_sel]
+            if len(rows_pos) + len(rows_neg) < 0.9 * len(input_matrix[:, remain_cols]):
+                logger.info(f"Column coverage too low < 90%, skipping. Cols: {cols_sel}")
                 status = False
 
             # Check if valid pattern was found
-            elif len(cols) < min_col_quality:
-                logger.info(f"Step found but with too few columns ({len(cols)}), skipping.")
+            elif len(cols_sel) < min_col_quality:
+                logger.info(f"Step found but with too few columns ({len(cols_sel)}), skipping.")
                 status = False  # Ou continue, selon si tu veux continuer à chercher d'autres patterns
             else:
                 # Save valid clustering step
-                steps_result.append((reads1, reads0, cols))
-                metrics_list.append(metricclustering_steps)
+                steps_result.append((rows_pos, rows_neg, cols_sel))
+                metrics_list.append(metrics_step)
 
                     # Remove processed columns from remaining set
-                remain_cols = [c for c in remain_cols if c not in cols]
+                remain_cols = [c for c in remain_cols if c not in cols_sel]
                 logger.info(f"Steps found: {steps_result}")
                 logger.info(f"Metrics: {metrics_list}")
     # Log clustering results for debugging
@@ -344,7 +344,7 @@ def clustering_step(input_matrix: np.ndarray,
     current_cols = range(matrix1.shape[1])  # All columns initially available
     clustering_1 = True  # Alternate between positive (True) and negative (False) patterns
     status = True  # Continue while valid patterns are found
-    rw1, rw0 = [], []  # Accumulate rows for positive and negative groups
+    rows_pos_accum, rows_neg_accum = [], []  # Accumulate rows for positive and negative groups
 
     logger.debug(f"clustering_step: input_matrix shape={input_matrix.shape}, error_rate={error_rate}, min_row_quality={min_row_quality}, min_col_quality={min_col_quality}")
 
@@ -355,40 +355,40 @@ def clustering_step(input_matrix: np.ndarray,
         if clustering_1:
             # Search for positive patterns (dense regions of 1s)
             logger.debug(f"clustering_step: Running ILP for positive pattern (1s)")
-            rw, cl, status = ilp(matrix1[remain_rows][:, current_cols], error_rate)
+            rows_local, cols_local, status = ilp(matrix1[remain_rows][:, current_cols], error_rate)
         else:
             # Search for negative patterns (dense regions of 0s in original)
             logger.debug(f"clustering_step: Running ILP for negative pattern (0s)")
-            rw, cl, status = ilp(matrix0[remain_rows][:, current_cols], error_rate)
+            rows_local, cols_local, status = ilp(matrix0[remain_rows][:, current_cols], error_rate)
         nb_ilp_steps += 1
 
-        logger.debug(f"clustering_step: ILP returned rw={rw}, cl={cl}, status={status}")
+        logger.debug(f"clustering_step: ILP returned rw={rows_local}, cl={cols_local}, status={status}")
 
         # Convert local indices back to global matrix coordinates
-        rw = [remain_rows[r] for r in rw]  # Map row indices to original matrix
-        cl = [current_cols[c] for c in cl]  # Map column indices to original matrix
-        logger.debug(f"clustering_step: Global rw={rw}, cl={cl}")
+        rows_local = [remain_rows[r] for r in rows_local]  # Map row indices to original matrix
+        cols_local = [current_cols[c] for c in cols_local]  # Map column indices to original matrix
+        logger.debug(f"clustering_step: Global rw={rows_local}, cl={cols_local}")
 
-        if len(cl) < min_col_quality:   
-            logger.debug(f"clustering_step: Too few columns found ({len(cl)}), stopping iteration.")
+        if len(cols_local) < min_col_quality:   
+            logger.debug(f"clustering_step: Too few columns found ({len(cols_local)}), stopping iteration.")
             status = False
         else:
-            current_cols = cl  # Update working column set to detected significant columns
+            current_cols = cols_local  # Update working column set to detected significant columns
             
             # Accumulate rows into appropriate pattern group if valid pattern found
-            if status and len(cl) > 0:
+            if status and len(cols_local) > 0:
                 found = True
-                if len(rw) * len(cl) > max_ilp_cluster_size:
-                    max_ilp_cluster_size = len(rw) * len(cl)
+                if len(rows_local) * len(cols_local) > max_ilp_cluster_size:
+                    max_ilp_cluster_size = len(rows_local) * len(cols_local)
                 if clustering_1:
-                    rw1.extend(rw)  # Add to positive pattern group
-                    logger.debug(f"clustering_step: Added {len(rw)} rows to rw1 (positive group).")
+                    rows_pos_accum.extend(rows_local)  # Add to positive pattern group
+                    logger.debug(f"clustering_step: Added {len(rows_local)} rows to rows_pos_accum (positive group).")
                 else:
-                    rw0.extend(rw)  # Add to negative pattern group
-                    logger.debug(f"clustering_step: Added {len(rw)} rows to rw0 (negative group).")
+                    rows_neg_accum.extend(rows_local)  # Add to negative pattern group
+                    logger.debug(f"clustering_step: Added {len(rows_local)} rows to rows_neg_accum (negative group).")
                 
         # Remove processed rows from remaining set for next iteration
-        remain_rows = [r for r in remain_rows if r not in rw]
+        remain_rows = [r for r in remain_rows if r not in rows_local]
         logger.debug(f"clustering_step: Updated remain_rows, now {len(remain_rows)} rows left.")
         # Alternate pattern detection type for next iteration
         clustering_1 = not clustering_1
@@ -396,23 +396,23 @@ def clustering_step(input_matrix: np.ndarray,
     # Log final clustering statistics
     if isinstance(current_cols, range):
         current_cols = list(current_cols)
-    if isinstance(rw0, range):
-        rw0 = list(rw0)
-    if isinstance(rw1, range):
-        rw1 = list(rw1)
-    logger.info(f"Final clustering results: rw1={len(rw1)}, rw0={len(rw0)}, current_cols={len(current_cols)}")
-    logger.debug(f"clustering_step: rw1={rw1}, rw0={rw0}, current_cols={current_cols}")
+    if isinstance(rows_neg_accum, range):
+        rows_neg_accum = list(rows_neg_accum)
+    if isinstance(rows_pos_accum, range):
+        rows_pos_accum = list(rows_pos_accum)
+    logger.info(f"Final clustering results: rows_pos={len(rows_pos_accum)}, rows_neg={len(rows_neg_accum)}, current_cols={len(current_cols)}")
+    logger.debug(f"clustering_step: rows_pos={rows_pos_accum}, rows_neg={rows_neg_accum}, current_cols={current_cols}")
     if found:
-        if len(rw0) > 0:
-            submatrix0 = input_matrix[rw0, :][:, current_cols]
+        if len(rows_neg_accum) > 0:
+            submatrix0 = input_matrix[rows_neg_accum, :][:, current_cols]
             if submatrix0.shape[0] > 0 and submatrix0.shape[1] > 0:
                 density_cluster0 = submatrix0.sum() / (submatrix0.shape[0] * submatrix0.shape[1])
             else:
                 density_cluster0 = -1
         else:
             density_cluster0 = -1
-        if len(rw1) > 0:
-            submatrix1 = input_matrix[rw1, :][:, current_cols]
+        if len(rows_pos_accum) > 0:
+            submatrix1 = input_matrix[rows_pos_accum, :][:, current_cols]
             if submatrix1.shape[0] > 0 and submatrix1.shape[1] > 0:
                 density_cluster1 = submatrix1.sum() / (submatrix1.shape[0] * submatrix1.shape[1])
             else:
@@ -430,4 +430,4 @@ def clustering_step(input_matrix: np.ndarray,
         "found": found,
     }
     logger.debug(f"clustering_step: metrics={metrics}")
-    return (rw0, rw1, current_cols), metrics
+    return (rows_neg_accum, rows_pos_accum, current_cols), metrics
