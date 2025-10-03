@@ -84,6 +84,11 @@
             margin: 5px;
         }
         
+        .matrix.compact {
+            line-height: 0;
+            font-size: 0;
+        }
+        
         .cell {
             border: 0.5px solid #e0e0e0;
             display: inline-block;
@@ -96,6 +101,19 @@
             z-index: 10;
             position: relative;
             border: 1px solid #333;
+        }
+        
+        .cell.compact {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+        }
+        
+        .cell.compact:hover {
+            opacity: 0.7;
+            transform: none;
+            z-index: auto;
+            border: none;
         }
         
         .cell-0 {
@@ -136,6 +154,11 @@
             display: block;
             margin: 0;
             line-height: 0;
+        }
+        
+        .row.compact {
+            padding: 0;
+            font-size: 0;
         }
         
         .sort-control {
@@ -202,6 +225,11 @@
                 <label for="autoSize">Ajustement automatique</label>
             </div>
             
+            <div class="auto-size">
+                <input type="checkbox" id="compactMode">
+                <label for="compactMode">Mode compact (sans bordures)</label>
+            </div>
+            
             <div class="sort-control">
                 <label for="sortBy">Trier les lignes par:</label>
                 <select id="sortBy">
@@ -261,6 +289,7 @@
         const cellSizeSlider = document.getElementById('cellSize');
         const cellSizeValue = document.getElementById('cellSizeValue');
         const autoSizeCheckbox = document.getElementById('autoSize');
+        const compactModeCheckbox = document.getElementById('compactMode');
         const sortBySelect = document.getElementById('sortBy');
         const csvUploadArea = document.getElementById('csvUploadArea');
         const txtUploadArea = document.getElementById('txtUploadArea');
@@ -276,6 +305,7 @@
         txtInput.addEventListener('change', handleTxtSelect);
         cellSizeSlider.addEventListener('input', updateCellSize);
         autoSizeCheckbox.addEventListener('change', handleAutoSizeChange);
+        compactModeCheckbox.addEventListener('change', handleCompactModeChange);
         window.addEventListener('resize', handleWindowResize);
         
         // Drag and drop pour CSV
@@ -530,6 +560,14 @@
             const rows = matrix.length;
             const cols = matrix[0].length;
             const cellSize = parseInt(cellSizeSlider.value);
+            const isCompact = compactModeCheckbox.checked;
+            
+            // Apply compact mode classes
+            if (isCompact) {
+                matrixElement.classList.add('compact');
+            } else {
+                matrixElement.classList.remove('compact');
+            }
             
             // Count values for statistics
             let blackCount = 0;
@@ -538,7 +576,7 @@
             // Create matrix visualization
             for (let i = 0; i < rows; i++) {
                 const rowDiv = document.createElement('div');
-                rowDiv.className = 'row';
+                rowDiv.className = isCompact ? 'row compact' : 'row';
                 
                 // Add row info for debugging
                 const originalRowIndex = rowIndices ? rowIndices[i] : i;
@@ -547,7 +585,7 @@
                 
                 for (let j = 0; j < cols; j++) {
                     const cell = document.createElement('div');
-                    cell.className = `cell cell-${matrix[i][j]}`;
+                    cell.className = isCompact ? `cell cell-${matrix[i][j]} compact` : `cell cell-${matrix[i][j]}`;
                     cell.style.width = cellSize + 'px';
                     cell.style.height = cellSize + 'px';
                     cell.title = `Position: (${i}, ${j}) | Valeur: ${matrix[i][j]} | Ligne orig: ${originalRowIndex} | Somme ligne: ${rowSum} | Densité: ${rowDensity}%`;
@@ -603,6 +641,12 @@
             }
         }
         
+        function handleCompactModeChange() {
+            if (currentMatrix) {
+                displayMatrix(currentMatrix);
+            }
+        }
+        
         function handleWindowResize() {
             if (autoSizeCheckbox.checked && currentMatrix) {
                 calculateOptimalSize();
@@ -613,6 +657,7 @@
         function resetView() {
             cellSizeSlider.value = 8;
             autoSizeCheckbox.checked = true;
+            compactModeCheckbox.checked = false;
             sortBySelect.value = 'original';
             updateCellSizeDisplay(8);
             
